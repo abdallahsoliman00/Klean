@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Switchboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect width='22' height='22' rx='7' fill='%231A1F27'/%3E%3Crect x='5' y='7' width='8' height='2' rx='1' fill='%23fff'/%3E%3Crect x='9' y='13' width='8' height='2' rx='1' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="js/api.js"></script>
+<style>
+:root{
+  --bg:#E9ECF0; --surface:#F7F8FA; --raised:#FFFFFF; --ink:#1A1F27; --muted:#5D6673; --faint:#8A929E;
+  --line:#D9DEE5; --line-soft:#E5E9EE; --accent:#2B59C3; --accent-hover:#244CA8; --accent-soft:#E2E9F8;
+  --accent-ink:#FFFFFF; --user:#E1E7F3; --danger:#B4372F; --danger-soft:#F7E3E1; --ok:#2F7D4F; --caret:#D9822B;
+  --code-bg:#EEF1F5; --shadow:0 12px 40px -12px rgba(26,31,39,.28), 0 2px 6px rgba(26,31,39,.06);
+  --t-key:#7A3EB8; --t-str:#2F7D4F; --t-num:#B05A12; --t-com:#8A929E; --t-fn:#2B59C3;
+  --ui:"Instrument Sans",system-ui,sans-serif; --prose:"Newsreader",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1); --sidebar:280px;
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --bg:#12151B; --surface:#181C23; --raised:#1F242D; --ink:#E6E9EE; --muted:#9AA3AF; --faint:#6B7480;
+  --line:#2A313C; --line-soft:#232932; --accent:#7C9CFF; --accent-hover:#97B0FF; --accent-soft:#232D47;
+  --accent-ink:#0F1420; --user:#232B3B; --danger:#F08A80; --danger-soft:#3A2223; --ok:#6CC594; --caret:#F0A75A;
+  --code-bg:#14181E; --shadow:0 16px 48px -12px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.3);
+  --t-key:#C79BFF; --t-str:#8FD4A8; --t-num:#F2B272; --t-com:#6B7480; --t-fn:#8FB0FF;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:var(--ui);font-size:14px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;overflow:auto}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+svg{display:block}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:100%;height:100vh;height:100dvh;min-height:640px;overflow:hidden;transition:grid-template-columns .32s var(--ease)}
+.app.collapsed{grid-template-columns:0 1fr}
+
+/* ---------- sidebar ---------- */
+.sidebar{overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.sidebar-inner{width:var(--sidebar);display:flex;flex-direction:column;height:100%;padding:14px 10px 10px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 14px}
+.brand-mark{width:22px;height:22px;border-radius:7px;background:var(--ink);position:relative}
+.brand-mark::before,.brand-mark::after{content:"";position:absolute;left:5px;right:5px;height:2px;border-radius:2px;background:var(--bg)}
+.brand-mark::before{top:7px;right:9px}.brand-mark::after{top:13px;left:9px}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-.01em}
+.new-chat{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:10px;background:var(--raised);border:1px solid var(--line);font-weight:500;transition:border-color .15s,transform .15s}
+.new-chat:hover{border-color:var(--faint)}
+.new-chat:active{transform:scale(.98)}
+.new-chat kbd{margin-left:auto}
+kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 5px;background:transparent}
+.search{position:relative;margin:10px 0 6px}
+.search input{width:100%;padding:8px 10px 8px 32px;border-radius:9px;border:1px solid transparent;background:transparent;outline:none;transition:background .15s,border-color .15s}
+.search input:hover{background:var(--line-soft)}
+.search input:focus{background:var(--raised);border-color:var(--line)}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--faint)}
+.chat-list{flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px;scrollbar-width:thin}
+.group-label{font-size:12px;color:var(--faint);padding:14px 10px 4px;font-weight:500}
+.chat-item{position:relative;display:flex;align-items:center;border-radius:9px;transition:background .12s}
+.chat-item:hover{background:var(--line-soft)}
+.chat-item.active{background:var(--raised);box-shadow:0 0 0 1px var(--line)}
+.chat-item button.open{flex:1;min-width:0;text-align:left;padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.chat-item.active button.open,.chat-item:hover button.open{color:var(--ink)}
+.chat-item .more{opacity:0;width:26px;height:26px;margin-right:4px;border-radius:6px;display:grid;place-items:center;color:var(--muted);transition:opacity .12s}
+.chat-item:hover .more,.chat-item.active .more,.chat-item .more:focus-visible{opacity:1}
+.chat-item .more:hover{background:var(--line)}
+.chat-item input{flex:1;margin:3px;padding:5px 7px;border:1px solid var(--accent);border-radius:7px;background:var(--raised);outline:none}
+.chat-item.fresh{animation:fresh .5s var(--ease)}
+@keyframes fresh{from{opacity:0;transform:translateY(-6px)}}
+.empty-list{padding:20px 10px;color:var(--faint);font-size:13px}
+.sidebar-foot{display:flex;gap:4px;padding-top:8px;border-top:1px solid var(--line)}
+.foot-btn{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;color:var(--muted);flex:1}
+.foot-btn:hover{background:var(--line-soft);color:var(--ink)}
+.icon-btn{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:var(--muted);transition:background .12s,color .12s}
+.icon-btn:hover{background:var(--line-soft);color:var(--ink)}
+
+/* ---------- main ---------- */
+.main{grid-column:2;background:var(--surface);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;position:relative;border-left:1px solid var(--line)}
+.app.collapsed .main{border-left-color:transparent}
+.topbar{display:flex;align-items:center;gap:6px;padding:10px 14px;height:56px;flex-shrink:0}
+.model-pill{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 12px;border-radius:10px;font-weight:500;transition:background .12s;max-width:52vw}
+.model-pill:hover{background:var(--line-soft)}
+.model-pill .prov{color:var(--faint);font-weight:400}
+.model-pill .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.model-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.model-pill .dot.off{background:var(--danger)}
+.topbar .spacer{flex:1}
+.ctx{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.ctx:hover{background:var(--line-soft)}
+.ctx svg circle{transition:stroke-dashoffset .5s var(--ease)}
+
+.thread-wrap{flex:1;overflow-y:auto;scroll-behavior:auto;position:relative}
+.thread{max-width:760px;margin:0 auto;padding:12px 28px 180px;transition:opacity .14s}
+.thread.switching{opacity:0}
+
+.msg{margin:0 0 28px}
+.msg.enter{animation:enter .38s var(--ease)}
+@keyframes enter{from{opacity:0;transform:translateY(8px)}}
+.msg.user{display:flex;flex-direction:column;align-items:flex-end}
+.bubble{background:var(--user);padding:10px 15px;border-radius:18px 18px 6px 18px;max-width:82%;white-space:pre-wrap;word-wrap:break-word;line-height:1.55;font-size:14.5px}
+.msg.user .tools{justify-content:flex-end}
+.edit-box{width:100%;background:var(--raised);border:1px solid var(--accent);border-radius:14px;padding:10px 12px;box-shadow:0 0 0 4px var(--accent-soft)}
+.edit-box textarea{width:100%;border:0;outline:none;resize:none;background:transparent;line-height:1.55;min-height:48px}
+.edit-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+
+.msg.assistant .who{font-size:12px;color:var(--faint);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.prose{font-family:var(--prose);font-size:17px;line-height:1.68;font-optical-sizing:auto;overflow-wrap:anywhere}
+.prose>*:first-child{margin-top:0}.prose>*:last-child{margin-bottom:0}
+.prose p{margin:0 0 .85em}
+.prose h1,.prose h2,.prose h3{font-family:var(--ui);font-weight:600;letter-spacing:-.01em;line-height:1.3;margin:1.4em 0 .5em}
+.prose h1{font-size:20px}.prose h2{font-size:18px}.prose h3{font-size:16px}
+.prose ul,.prose ol{padding-left:1.3em;margin:0 0 .9em}
+.prose li{margin:.25em 0}
+.prose li::marker{color:var(--faint)}
+.prose a{color:var(--accent);text-underline-offset:3px}
+.prose blockquote{margin:0 0 .9em;padding-left:14px;border-left:3px solid var(--line);color:var(--muted)}
+.prose strong{font-weight:600}
+.prose :not(pre)>code{font-family:var(--mono);font-size:.8em;background:var(--code-bg);padding:.15em .4em;border-radius:5px}
+.prose table{border-collapse:collapse;font-family:var(--ui);font-size:13.5px;margin:0 0 1em;display:block;overflow-x:auto}
+.prose th,.prose td{border-bottom:1px solid var(--line);padding:7px 12px;text-align:left}
+.prose th{font-weight:600}
+.code{margin:0 0 1em;border-radius:12px;background:var(--code-bg);border:1px solid var(--line-soft);overflow:hidden}
+.code-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 6px 14px;font-family:var(--ui);font-size:12px;color:var(--faint);border-bottom:1px solid var(--line-soft)}
+.code-head button{padding:3px 8px;border-radius:6px;color:var(--muted)}
+.code-head button:hover{background:var(--line);color:var(--ink)}
+.code pre{margin:0;padding:12px 14px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.6}
+.hljs-keyword,.hljs-built_in,.hljs-selector-tag,.hljs-literal{color:var(--t-key)}
+.hljs-string,.hljs-attr,.hljs-template-variable{color:var(--t-str)}
+.hljs-number,.hljs-symbol{color:var(--t-num)}
+.hljs-comment,.hljs-quote{color:var(--t-com);font-style:italic}
+.hljs-title,.hljs-function .hljs-title,.hljs-title.function_{color:var(--t-fn)}
+.caret{display:inline-block;width:.5em;height:1.05em;vertical-align:-.15em;margin-left:2px;border-radius:2px;background:var(--caret);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+.thinking{display:flex;gap:5px;padding:10px 0}
+.thinking i{width:7px;height:7px;border-radius:50%;background:var(--faint);animation:bob 1.1s var(--ease) infinite}
+.thinking i:nth-child(2){animation-delay:.15s}.thinking i:nth-child(3){animation-delay:.3s}
+@keyframes bob{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-4px)}}
+.msg-error{font-family:var(--ui);font-size:13.5px;color:var(--danger);background:var(--danger-soft);padding:10px 14px;border-radius:10px;display:flex;gap:10px;align-items:center}
+.msg-error button{margin-left:auto;font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.stopped{font-family:var(--ui);font-size:12px;color:var(--faint);margin-top:6px}
+
+.tools{display:flex;gap:2px;margin-top:6px;opacity:0;transition:opacity .15s}
+.msg:hover .tools,.msg:focus-within .tools,.msg.last .tools{opacity:1}
+.tool{display:flex;align-items:center;gap:5px;height:28px;padding:0 8px;border-radius:7px;color:var(--faint);font-size:12px}
+.tool:hover{background:var(--line-soft);color:var(--ink)}
+.tool.done{color:var(--ok)}
+
+/* empty state */
+.welcome{max-width:560px;margin:14vh auto 0;padding:0 28px;text-align:left}
+.welcome h1{font-family:var(--prose);font-weight:400;font-size:34px;letter-spacing:-.015em;line-height:1.2;margin:0 0 8px}
+.welcome p{color:var(--muted);margin:0 0 26px;font-size:15px;line-height:1.5}
+.starters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.starter{text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--raised);line-height:1.4;color:var(--muted);transition:border-color .15s,color .15s,transform .15s}
+.starter:hover{border-color:var(--faint);color:var(--ink)}
+.starter:active{transform:scale(.985)}
+.starter b{display:block;color:var(--ink);font-weight:500;margin-bottom:2px}
+.welcome.no-provider .cta{display:inline-flex}
+
+/* composer */
+.composer-dock{position:absolute;left:0;right:0;bottom:0;padding:0 28px 18px;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--surface) 38%)}
+.composer{pointer-events:auto;max-width:760px;margin:0 auto;padding-top:28px}
+.jump{pointer-events:auto;position:absolute;left:50%;top:-6px;transform:translate(-50%,8px);opacity:0;visibility:hidden;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--raised);border:1px solid var(--line);box-shadow:var(--shadow);font-size:12.5px;font-weight:500;transition:opacity .2s,transform .2s var(--ease),visibility .2s}
+.jump.show{opacity:1;visibility:visible;transform:translate(-50%,0)}
+.box{position:relative;background:var(--raised);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);transition:border-color .15s,box-shadow .2s}
+.box:focus-within{border-color:var(--faint)}
+.box textarea{display:block;width:100%;border:0;outline:none;resize:none;background:transparent;padding:15px 16px 4px;line-height:1.5;max-height:240px;font-size:15px}
+.box textarea::placeholder{color:var(--faint)}
+.box-row{display:flex;align-items:center;gap:6px;padding:6px 8px 8px 10px}
+.chip{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;color:var(--muted);font-size:12.5px}
+.chip:hover{background:var(--line-soft);color:var(--ink)}
+.send{margin-left:auto;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);transition:background .15s,transform .15s,opacity .15s}
+.send:hover{background:var(--accent-hover)}
+.send:active{transform:scale(.92)}
+.send:disabled{opacity:.35;cursor:default;transform:none}
+.send .i-stop{display:none}
+.send.stop{background:var(--ink);color:var(--surface)}
+.send.stop .i-send{display:none}.send.stop .i-stop{display:block}
+.hint{text-align:center;font-size:11.5px;color:var(--faint);margin-top:8px}
+
+/* overlays */
+.scrim{position:fixed;inset:0;background:rgba(18,21,27,.32);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s;z-index:40}
+.scrim.show{opacity:1;visibility:visible}
+.palette{position:fixed;z-index:50;left:50%;top:14vh;width:min(560px,calc(100vw - 32px));background:var(--raised);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);transform:translate(-50%,-8px) scale(.98);opacity:0;visibility:hidden;transition:opacity .16s,transform .2s var(--ease),visibility .16s;overflow:hidden}
+.palette.show{opacity:1;visibility:visible;transform:translate(-50%,0) scale(1)}
+.palette-search{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.palette-search input{flex:1;border:0;outline:none;background:transparent;font-size:15px}
+.palette-list{max-height:52vh;overflow-y:auto;padding:6px}
+.p-group{display:flex;align-items:center;justify-content:space-between;padding:10px 10px 4px;font-size:12px;color:var(--faint);font-weight:500}
+.p-group button{display:flex;align-items:center;gap:4px;padding:2px 6px;border-radius:6px;color:var(--faint)}
+.p-group button:hover{background:var(--line-soft);color:var(--ink)}
+.p-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:9px;text-align:left}
+.p-item.sel{background:var(--accent-soft)}
+.p-item .m{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-item .meta{font-size:12px;color:var(--faint)}
+.p-item .check{color:var(--accent);visibility:hidden}
+.p-item.current .check{visibility:visible}
+.p-err{margin:2px 10px 8px;padding:9px 12px;font-size:12.5px;color:var(--danger);background:var(--danger-soft);border-radius:9px;line-height:1.45}
+.p-empty{padding:28px;text-align:center;color:var(--faint)}
+.p-foot{display:flex;gap:14px;padding:9px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+.spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* side panel */
+.panel{position:fixed;z-index:45;top:0;right:0;bottom:0;width:min(380px,100vw);background:var(--raised);border-left:1px solid var(--line);box-shadow:var(--shadow);transform:translateX(calc(100% + 64px));transition:transform .3s var(--ease);display:flex;flex-direction:column}
+.panel.show{transform:none}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px 20px}
+.panel-head h2{font-size:15px;font-weight:600;margin:0}
+.panel-body{padding:4px 20px 20px;overflow-y:auto;flex:1}
+.field{margin-bottom:18px}
+.field label{display:block;font-weight:500;margin-bottom:6px}
+.field .sub{font-size:12.5px;color:var(--faint);margin:-2px 0 8px;line-height:1.45}
+.input,.textarea{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--surface);outline:none;transition:border-color .15s,box-shadow .15s}
+.input:focus,.textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.textarea{resize:vertical;min-height:110px;line-height:1.5}
+.range-row{display:flex;align-items:center;gap:12px}
+.range-row input{flex:1;accent-color:var(--accent)}
+.range-row output{width:34px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-soft);color:var(--muted);font-variant-numeric:tabular-nums}
+.stat b{color:var(--ink);font-weight:500}
+
+/* settings modal */
+.modal{position:fixed;z-index:50;left:50%;top:50%;width:min(860px,calc(100vw - 32px));height:min(600px,calc(100vh - 48px));background:var(--raised);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);transform:translate(-50%,-48%) scale(.98);opacity:0;visibility:hidden;transition:opacity .18s,transform .24s var(--ease),visibility .18s;display:grid;grid-template-columns:220px 1fr;grid-template-rows:100%;overflow:hidden}
+.modal.show{opacity:1;visibility:visible;transform:translate(-50%,-50%) scale(1)}
+.modal-side{background:var(--surface);border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.modal-side h2{font-size:15px;margin:2px 10px 14px;font-weight:600}
+.side-label{font-size:12px;color:var(--faint);padding:12px 10px 4px;font-weight:500}
+.side-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;text-align:left;color:var(--muted)}
+.side-item:hover{background:var(--line-soft);color:var(--ink)}
+.side-item.active{background:var(--raised);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.side-item .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.side-item .dot.ok{background:var(--ok)}.side-item .dot.err{background:var(--danger)}
+.side-item.add{color:var(--accent)}
+.modal-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.modal-main .panel-head{border-bottom:1px solid var(--line-soft);padding:16px 18px 14px 24px}
+.modal-content{padding:20px 24px;overflow-y:auto;flex:1}
+.modal-content .field{max-width:520px}
+.modal-actions{display:flex;gap:8px;padding:14px 24px;border-top:1px solid var(--line-soft)}
+.btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:9px;font-weight:500;border:1px solid var(--line);background:var(--raised);transition:background .12s,border-color .12s,transform .12s}
+.btn:hover{border-color:var(--faint)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.danger{color:var(--danger)}
+.btn.small{height:30px;padding:0 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.models-box{border:1px solid var(--line);border-radius:12px;max-width:520px;overflow:hidden}
+.models-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--line-soft)}
+.models-head span{color:var(--muted)}
+.models-list{max-height:180px;overflow-y:auto;padding:6px}
+.model-row{display:flex;justify-content:space-between;padding:6px 8px;border-radius:7px;font-family:var(--mono);font-size:12.5px}
+.model-row:hover{background:var(--line-soft)}
+.model-row span{color:var(--faint);font-family:var(--ui)}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{padding:6px 14px;border-radius:7px;color:var(--muted)}
+.seg button.on{background:var(--raised);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line)}
+.select{appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%238A929E' stroke-width='1.6'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E") no-repeat right 10px center;padding-right:30px}
+
+/* menu & toast */
+.menu{position:fixed;z-index:60;min-width:160px;background:var(--raised);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:5px;opacity:0;transform:scale(.96);transform-origin:top left;transition:opacity .12s,transform .14s var(--ease);pointer-events:none}
+.menu.show{opacity:1;transform:none;pointer-events:auto}
+.menu button{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:7px;text-align:left}
+.menu button:hover{background:var(--line-soft)}
+.menu button.danger{color:var(--danger)}
+.toasts{position:fixed;z-index:70;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:12px;background:var(--ink);color:var(--surface);padding:10px 14px;border-radius:11px;font-size:13.5px;box-shadow:var(--shadow);animation:toast .3s var(--ease)}
+.toast button{color:var(--surface);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.toast.out{opacity:0;transform:translateY(6px);transition:all .2s}
+@keyframes toast{from{opacity:0;transform:translateY(10px)}}
+.confirm{position:fixed;z-index:80;left:50%;top:50%;transform:translate(-50%,-50%);width:min(380px,calc(100vw - 32px));background:var(--raised);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px}
+.confirm h3{margin:0 0 6px;font-size:15px}
+.confirm p{margin:0 0 18px;color:var(--muted);line-height:1.5}
+.confirm .row{display:flex;justify-content:flex-end;gap:8px}
+
+.mobile-only{display:none}
+@media (max-width:820px){
+  .app,.app.collapsed{grid-template-columns:0 1fr}
+  .sidebar{position:fixed;z-index:46;top:0;bottom:0;left:0;width:var(--sidebar);background:var(--bg);transform:translateX(calc(-100% - 64px));transition:transform .3s var(--ease);box-shadow:var(--shadow)}
+  .app.mobile-open .sidebar{transform:none}
+  .main{border-left:0}
+  .thread{padding:8px 16px 170px}
+  .composer-dock{padding:0 12px 12px}
+  .starters{grid-template-columns:1fr}
+  .welcome{margin-top:8vh}
+  .modal{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .modal-side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:10px}
+  .modal-side h2,.side-label{display:none}
+  .side-item{white-space:nowrap}
+  .ctx .label{display:none}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar" aria-label="Chats">
+    <div class="sidebar-inner">
+      <div class="brand"><div class="brand-mark" aria-hidden="true"></div><span class="brand-name">Switchboard</span></div>
+      <button class="new-chat" id="newChat">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
+        New chat <kbd>Ctrl ⇧ O</kbd>
+      </button>
+      <label class="search"><span class="sr">Search chats</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14" stroke-linecap="round"/></svg>
+        <input id="search" placeholder="Search chats" autocomplete="off">
+      </label>
+      <nav class="chat-list" id="chatList"></nav>
+      <div class="sidebar-foot">
+        <button class="foot-btn" id="openSettings">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke-linecap="round"/></svg>
+          Providers &amp; settings
+        </button>
+        <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 9.5A5.5 5.5 0 016.5 2.5a5.5 5.5 0 107 7z" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="toggleSidebar" aria-label="Toggle sidebar" title="Toggle sidebar (Ctrl+B)">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3" width="13" height="12" rx="2.5"/><path d="M7 3v12"/></svg>
+      </button>
+      <button class="model-pill" id="modelPill" title="Switch model (Ctrl+K)">
+        <span class="dot" id="pillDot"></span><span class="prov" id="pillProv"></span><span class="name" id="pillModel"></span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5l3 3 3-3"/></svg>
+      </button>
+      <div class="spacer"></div>
+      <button class="ctx" id="ctxBtn" title="Chat settings and context">
+        <svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--line)" stroke-width="2.2"/><circle id="ctxRing" cx="9" cy="9" r="7" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="43.98" stroke-dashoffset="43.98" transform="rotate(-90 9 9)"/></svg>
+        <span class="label" id="ctxLabel">0 / 8k</span>
+      </button>
+      <button class="icon-btn" id="chatSettingsBtn" aria-label="Chat settings" title="Chat settings">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 5h7M13 5h2M3 13h2M8 13h7"/><circle cx="11.5" cy="5" r="1.5"/><circle cx="6.5" cy="13" r="1.5"/></svg>
+      </button>
+    </header>
+
+    <div class="thread-wrap" id="scroller">
+      <div class="thread" id="thread"></div>
+    </div>
+
+    <div class="composer-dock">
+      <div class="composer" style="position:relative">
+        <button class="jump" id="jump"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 2v8M2.5 6.5L6 10l3.5-3.5"/></svg>Jump to latest</button>
+        <form class="box" id="composer">
+          <label class="sr" for="input">Message</label>
+          <textarea id="input" rows="1" dir="auto" placeholder="Message"></textarea>
+          <div class="box-row">
+            <button type="button" class="chip" id="sysChip" title="System prompt">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3.5h10M3 8h10M3 12.5h6" stroke-linecap="round"/></svg>
+              <span id="sysChipLabel">No system prompt</span>
+            </button>
+            <button type="submit" class="send" id="send" aria-label="Send message" disabled>
+              <svg class="i-send" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg>
+              <svg class="i-stop" width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="2.5" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </form>
+        <div class="hint">Enter sends, Shift+Enter adds a line, Ctrl+K switches model</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="palette" id="palette" role="dialog" aria-label="Choose a model">
+  <div class="palette-search">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--faint)" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14" stroke-linecap="round"/></svg>
+    <input id="paletteInput" placeholder="Search models" autocomplete="off">
+    <kbd>Esc</kbd>
+  </div>
+  <div class="palette-list" id="paletteList" role="listbox"></div>
+  <div class="p-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> to move</span><span><kbd>Enter</kbd> to select</span></div>
+</div>
+
+<aside class="panel" id="chatPanel" aria-label="Chat settings">
+  <div class="panel-head"><h2>Chat settings</h2><button class="icon-btn" data-close aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+  <div class="panel-body">
+    <div class="field">
+      <label for="sysPrompt">System prompt</label>
+      <p class="sub">Sent at the start of every request in this chat.</p>
+      <textarea class="textarea" id="sysPrompt" placeholder="You are a concise assistant…"></textarea>
+    </div>
+    <div class="field">
+      <label for="temp">Temperature</label>
+      <div class="range-row"><input type="range" id="temp" min="0" max="2" step="0.1" value="0.7"><output id="tempOut">0.7</output></div>
+    </div>
+    <div class="field">
+      <label for="ctxWindow">Context window</label>
+      <p class="sub">When a chat outgrows this, the oldest messages are left out of the request. The system prompt is always kept.</p>
+      <select class="input select" id="ctxWindow">
+        <option value="4096">4k tokens</option><option value="8192" selected>8k tokens</option><option value="16384">16k tokens</option><option value="32768">32k tokens</option><option value="131072">128k tokens</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>This chat</label>
+      <div class="stat"><span>Messages</span><b id="statMsgs">0</b></div>
+      <div class="stat"><span>Estimated tokens</span><b id="statTok">0</b></div>
+      <div class="stat"><span>Sent with next request</span><b id="statSent">0</b></div>
+    </div>
+  </div>
+</aside>
+
+<div class="modal" id="settings" role="dialog" aria-label="Settings">
+  <div class="modal-side" id="settingsSide"></div>
+  <div class="modal-main">
+    <div class="panel-head"><h2 id="settingsTitle">Provider</h2><button class="icon-btn" data-close aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+    <div class="modal-content" id="settingsContent"></div>
+    <div class="modal-actions" id="settingsActions"></div>
+  </div>
+</div>
+
+<div class="menu" id="menu"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+const api = window.SwitchboardAPI;
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else if (v !== false && v != null) n.setAttribute(k, v); } for (const k of kids) n.append(k); return n; };
+const icon = {
+  copy: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="2"/><path d="M10.5 5V3.8A1.3 1.3 0 009.2 2.5H3.8a1.3 1.3 0 00-1.3 1.3v5.4a1.3 1.3 0 001.3 1.3H5"/></svg>',
+  check: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg>',
+  redo: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v3.5H9.5"/><path d="M12.6 6.5A5 5 0 103 9"/></svg>',
+  edit: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>',
+  dots: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/></svg>',
+  plus: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
+  refresh: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v3.5H9.5"/><path d="M12.6 6.5A5 5 0 103 9"/></svg>',
+};
+
+const S = {
+  providers: [], models: {}, modelErrors: {}, modelLoading: {},
+  chats: [], chat: null, sel: { providerId: null, model: null },
+  streaming: null, stick: true, query: '',
+};
+
+/* ---------- markdown ---------- */
+const md = (() => {
+  if (!window.marked) return t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\n/g, '<br>');
+  const r = new marked.Renderer();
+  r.code = (code, lang) => {
+    const text = typeof code === 'object' ? code.text : code; lang = (typeof code === 'object' ? code.lang : lang) || '';
+    let html; try { html = window.hljs && lang && hljs.getLanguage(lang) ? hljs.highlight(text, { language: lang }).value : (window.hljs ? hljs.highlightAuto(text).value : text.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))); } catch { html = text; }
+    return `<div class="code"><div class="code-head"><span>${lang || 'code'}</span><button type="button" data-copy-code>Copy</button></div><pre><code>${html}</code></pre></div>`;
+  };
+  marked.setOptions({ renderer: r, gfm: true, breaks: false });
+  return t => { const h = marked.parse(t); return window.DOMPurify ? DOMPurify.sanitize(h, { ADD_ATTR: ['data-copy-code'] }) : h; };
+})();
+
+/* ---------- tokens (rough estimate: ~4 chars per token) ---------- */
+const est = t => Math.ceil((t || '').length / 4);
+function contextStats(chat) {
+  if (!chat) return { total: 0, sent: 0, win: 8192 };
+  const win = chat.contextWindow || 8192, sys = est(chat.systemPrompt);
+  const toks = chat.messages.map(m => est(m.content) + 4);
+  const total = sys + toks.reduce((a, b) => a + b, 0);
+  let sent = sys, budget = win * 0.75; // leave room for the reply
+  for (let i = toks.length - 1; i >= 0; i--) { if (sent + toks[i] > budget) break; sent += toks[i]; }
+  return { total, sent, win };
+}
+const kfmt = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(n);
+function renderContext() {
+  const { total, sent, win } = contextStats(S.chat);
+  const frac = Math.min(1, sent / win);
+  $('#ctxRing').style.strokeDashoffset = 43.98 * (1 - frac);
+  $('#ctxRing').style.stroke = frac > .9 ? 'var(--danger)' : 'var(--accent)';
+  $('#ctxLabel').textContent = `${kfmt(sent)} / ${kfmt(win)}`;
+  $('#statMsgs').textContent = S.chat ? S.chat.messages.length : 0;
+  $('#statTok').textContent = total.toLocaleString();
+  $('#statSent').textContent = sent.toLocaleString() + (sent < total ? ' (oldest trimmed)' : '');
+}
+
+/* ---------- sidebar ---------- */
+function groupOf(ts) {
+  const d = new Date(ts), t = new Date(); t.setHours(0, 0, 0, 0);
+  const diff = (t - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5;
+  return diff <= 0 ? 'Today' : diff === 1 ? 'Yesterday' : diff < 7 ? 'Previous 7 days' : diff < 30 ? 'Previous 30 days' : 'Older';
+}
+function renderSidebar(freshId) {
+  const list = $('#chatList'); list.innerHTML = '';
+  const q = S.query.toLowerCase();
+  const items = S.chats.filter(c => !q || c.title.toLowerCase().includes(q));
+  if (!items.length) { list.append(el('div', { class: 'empty-list' }, q ? `No chats match “${S.query}”.` : 'Your chats will show up here.')); return; }
+  let last = null;
+  for (const c of items) {
+    const g = groupOf(c.updatedAt);
+    if (g !== last) { list.append(el('div', { class: 'group-label' }, g)); last = g; }
+    const more = el('button', { class: 'more', 'aria-label': 'Chat options', onclick: e => { e.stopPropagation(); chatMenu(e.currentTarget, c); } }); more.innerHTML = icon.dots;
+    const item = el('div', { class: 'chat-item' + (S.chat && S.chat.id === c.id ? ' active' : '') + (c.id === freshId ? ' fresh' : ''), 'data-id': c.id },
+      el('button', { class: 'open', onclick: () => openChat(c.id), ondblclick: () => startRename(c) }, c.title), more);
+    list.append(item);
+  }
+}
+function chatMenu(anchor, c) {
+  showMenu(anchor, [
+    { label: 'Rename', icon: icon.edit, run: () => startRename(c) },
+    { label: 'Delete', icon: icon.trash, danger: true, run: () => deleteChat(c) },
+  ]);
+}
+function startRename(c) {
+  const row = document.querySelector(`.chat-item[data-id="${c.id}"]`); if (!row) return;
+  const input = el('input', { value: c.title, 'aria-label': 'Chat title' });
+  row.replaceChildren(input); input.focus(); input.select();
+  let done = false;
+  const commit = async save => {
+    if (done) return; done = true;
+    const v = input.value.trim();
+    if (save && v && v !== c.title) { c.title = v; await api.chats.update(c.id, { title: v }); if (S.chat && S.chat.id === c.id) S.chat.title = v; }
+    renderSidebar();
+  };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') commit(true); if (e.key === 'Escape') commit(false); });
+  input.addEventListener('blur', () => commit(true));
+}
+async function deleteChat(c) {
+  await api.chats.remove(c.id);
+  S.chats = S.chats.filter(x => x.id !== c.id);
+  if (S.chat && S.chat.id === c.id) { S.chat = null; renderThread(); }
+  renderSidebar();
+  toast(`Deleted “${c.title}”`, 'Undo', async () => { await api.chats.restore(c.id); S.chats = await api.chats.list(); renderSidebar(); });
+}
+
+/* ---------- thread ---------- */
+const scroller = $('#scroller');
+function atBottom() { return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80; }
+function toBottom(smooth) { scroller.scrollTo({ top: scroller.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); }
+scroller.addEventListener('scroll', () => { S.stick = atBottom(); $('#jump').classList.toggle('show', !S.stick && !!S.chat && S.chat.messages.length > 0); }, { passive: true });
+$('#jump').onclick = () => { S.stick = true; toBottom(true); };
+
+function renderThread({ animateLast = false, fade = false, sending = false } = {}) {
+  const t = $('#thread');
+  const paint = () => {
+    t.innerHTML = '';
+    if (!S.chat || !S.chat.messages.length) { t.append(welcome()); }
+    else {
+      S.chat.messages.forEach((m, i, arr) => t.append(messageEl(m, i === arr.length - 1, animateLast && i === arr.length - 1)));
+      if (S.chat.messages.at(-1).role === 'user' && !sending) {
+        t.append(el('div', { class: 'msg assistant' }, el('div', { class: 'msg-error', style: 'background:var(--line-soft);color:var(--muted)' }, 'This message has no reply yet.',
+          el('button', { type: 'button', onclick: e => { e.currentTarget.closest('.msg').remove(); send({ regenerate: true }); } }, 'Get a reply'))));
+      }
+    }
+    renderContext(); renderSysChip();
+    requestAnimationFrame(() => { toBottom(false); S.stick = true; $('#jump').classList.remove('show'); });
+  };
+  if (fade) { t.classList.add('switching'); setTimeout(() => { paint(); t.classList.remove('switching'); }, 120); } else paint();
+}
+function welcome() {
+  const p = S.providers.find(x => x.id === S.sel.providerId);
+  if (!S.providers.length) {
+    return el('div', { class: 'welcome' },
+      el('h1', {}, 'Connect a model to start'),
+      el('p', {}, 'Add any server that speaks the OpenAI API: Ollama, LM Studio, vLLM, OpenRouter, or OpenAI itself.'),
+      el('button', { class: 'btn primary', onclick: () => openSettings(null) }, 'Add a provider'));
+  }
+  const starters = [
+    ['Explain a concept', 'How does SQLite handle concurrent writes?'],
+    ['Write some code', 'Write a Python function that retries a request with backoff.'],
+    ['Think it through', 'Help me compare Postgres and SQLite for a small side project.'],
+    ['Tighten some text', 'Make this paragraph shorter and clearer: '],
+  ];
+  return el('div', { class: 'welcome' },
+    el('h1', {}, 'What are we working on?'),
+    el('p', {}, S.sel.model ? `You're talking to ${S.sel.model} on ${p ? p.name : ''}. Switch any time with Ctrl+K.` : 'Pick a model to begin.'),
+    el('div', { class: 'starters' }, ...starters.map(([h, q]) => el('button', { class: 'starter', onclick: () => { const i = $('#input'); i.value = q; i.focus(); autosize(); syncSend(); } }, el('b', {}, h), q))));
+}
+function messageEl(m, isLast, animate) {
+  const wrap = el('div', { class: `msg ${m.role}${isLast ? ' last' : ''}${animate ? ' enter' : ''}`, 'data-id': m.id });
+  if (m.role === 'user') {
+    wrap.append(el('div', { class: 'bubble', dir: 'auto' }, m.content));
+    const tools = el('div', { class: 'tools' });
+    tools.append(toolBtn(icon.copy, 'Copy', b => copy(m.content, b)), toolBtn(icon.edit, 'Edit', () => editMessage(wrap, m)));
+    wrap.append(tools);
+  } else {
+    wrap.append(el('div', { class: 'who' }, m.model || 'assistant'));
+    const body = el('div', { class: 'prose', dir: 'auto' }); body.innerHTML = md(m.content); wrap.append(body);
+    if (m.stopped) wrap.append(el('div', { class: 'stopped' }, 'Stopped early'));
+    const tools = el('div', { class: 'tools' });
+    tools.append(toolBtn(icon.copy, 'Copy', b => copy(m.content, b)));
+    if (isLast) tools.append(toolBtn(icon.redo, 'Regenerate', () => send({ regenerate: true })));
+    wrap.append(tools);
+  }
+  return wrap;
+}
+function toolBtn(svg, label, fn) { const b = el('button', { class: 'tool', type: 'button', 'aria-label': label, title: label }); b.innerHTML = svg + `<span>${label}</span>`; b.onclick = () => fn(b); return b; }
+async function copy(text, btn) {
+  try { await navigator.clipboard.writeText(text); } catch { toast('Copy was blocked by the browser'); return; }
+  if (btn) { const old = btn.innerHTML; btn.classList.add('done'); btn.innerHTML = icon.check + '<span>Copied</span>'; setTimeout(() => { btn.classList.remove('done'); btn.innerHTML = old; }, 1400); }
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-copy-code]'); if (!b) return; const code = b.closest('.code').querySelector('code').innerText; navigator.clipboard.writeText(code).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1400); }, () => toast('Copy was blocked by the browser')); });
+
+function editMessage(wrap, m) {
+  if (S.streaming) return;
+  const ta = el('textarea', {}); ta.value = m.content;
+  const box = el('div', { class: 'edit-box' }, ta, el('div', { class: 'edit-actions' },
+    el('button', { class: 'btn small', type: 'button', onclick: () => renderThread() }, 'Cancel'),
+    el('button', { class: 'btn small primary', type: 'button', onclick: () => { const v = ta.value.trim(); if (v) send({ content: v, editMessageId: m.id }); } }, 'Save and resend')));
+  wrap.replaceChildren(box);
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ta.addEventListener('input', fit); fit(); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); box.querySelector('.primary').click(); } if (e.key === 'Escape') renderThread(); });
+}
+
+/* ---------- sending & streaming ---------- */
+const input = $('#input'), sendBtn = $('#send');
+function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 240) + 'px'; }
+function syncSend() {
+  sendBtn.classList.toggle('stop', !!S.streaming);
+  sendBtn.setAttribute('aria-label', S.streaming ? 'Stop generating' : 'Send message');
+  sendBtn.disabled = !S.streaming && (!input.value.trim() || !S.sel.model);
+}
+input.addEventListener('input', () => { autosize(); syncSend(); });
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!S.streaming) $('#composer').requestSubmit(); } });
+$('#composer').addEventListener('submit', e => {
+  e.preventDefault();
+  if (S.streaming) { S.streaming.abort(); return; }
+  const v = input.value.trim(); if (!v || !S.sel.model) return;
+  input.value = ''; autosize(); send({ content: v });
+});
+
+async function send({ content, editMessageId, regenerate }) {
+  if (S.streaming) return;
+  let created = false;
+  if (!S.chat) { S.chat = await api.chats.create({ providerId: S.sel.providerId, model: S.sel.model, ...(S.draft || {}) }); S.draft = null; created = true; }
+  const chat = S.chat, t = $('#thread');
+  // optimistic local update
+  if (editMessageId) { const i = chat.messages.findIndex(m => m.id === editMessageId); chat.messages.splice(i); }
+  if (regenerate) { while (chat.messages.length && chat.messages.at(-1).role === 'assistant') chat.messages.pop(); }
+  else chat.messages.push({ id: 'tmp', role: 'user', content });
+  renderThread({ animateLast: !regenerate, sending: true });
+  if (created) { S.chats.unshift({ ...chat }); renderSidebar(); }
+
+  // streaming placeholder
+  const live = el('div', { class: 'msg assistant enter' }, el('div', { class: 'who' }, S.sel.model), el('div', { class: 'prose', dir: 'auto' }));
+  const body = live.querySelector('.prose');
+  body.innerHTML = '<div class="thinking"><i></i><i></i><i></i></div>';
+  t.querySelectorAll('.msg.last').forEach(n => n.classList.remove('last'));
+  t.append(live); S.stick = true; toBottom(true);
+
+  const ctrl = new AbortController(); S.streaming = ctrl; syncSend();
+  let buf = '', raf = 0;
+  const paint = () => { raf = 0; body.innerHTML = md(buf); const last = body.lastElementChild; const caret = el('span', { class: 'caret' }); const target = !last ? body : last.classList.contains('code') ? last.querySelector('code') : /^(P|LI|H\d)$/.test(last.tagName) ? last : (last.matches('ul,ol') ? last.lastElementChild || last : body); target.append(caret); if (S.stick) toBottom(false); };
+  try {
+    const res = await api.chats.send(chat.id, { content, providerId: S.sel.providerId, model: S.sel.model, editMessageId, regenerate }, {
+      signal: ctrl.signal,
+      onUser: um => { const tmp = chat.messages.find(m => m.id === 'tmp'); if (tmp) tmp.id = um.id; },
+      onToken: tok => { buf += tok; if (!raf) raf = requestAnimationFrame(paint); },
+    });
+    cancelAnimationFrame(raf);
+    if (!res.message.content) { live.remove(); return; }
+    chat.messages.push(res.message);
+    if (res.title) { chat.title = res.title; }
+    const row = S.chats.find(c => c.id === chat.id); if (row) { row.title = chat.title; row.updatedAt = Date.now(); }
+    S.chats.sort((a, b) => b.updatedAt - a.updatedAt);
+    live.replaceWith(messageEl(res.message, true, false));
+    renderSidebar(res.title ? chat.id : null);
+  } catch (err) {
+    cancelAnimationFrame(raf);
+    const tmpIdx = chat.messages.findIndex(m => m.id === 'tmp');
+    if (tmpIdx > -1) { // never reached the server: give the text back
+      chat.messages.splice(tmpIdx, 1); live.remove(); renderThread();
+      if (!input.value) { input.value = content; autosize(); }
+      toast(err.message); return;
+    }
+    const retry = el('button', { type: 'button', onclick: () => { live.remove(); send({ regenerate: true }); } }, 'Retry');
+    body.replaceWith(el('div', { class: 'msg-error' }, err.message, retry));
+  } finally {
+    S.streaming = null; syncSend(); renderContext();
+    // keep last-message tools visible on the right node
+    t.querySelectorAll('.msg').forEach((n, i, a) => n.classList.toggle('last', i === a.length - 1));
+  }
+}
+
+/* ---------- chats ---------- */
+async function openChat(id) {
+  if (S.streaming) S.streaming.abort();
+  if (S.chat && S.chat.id === id) return closeMobile();
+  S.chat = await api.chats.get(id);
+  if (S.chat) { S.sel = { providerId: S.chat.providerId, model: S.chat.model }; renderPill(); }
+  renderSidebar(); renderThread({ fade: true }); loadChatPanel(); closeMobile();
+}
+function newChat() {
+  if (S.streaming) S.streaming.abort();
+  S.chat = null; renderSidebar(); renderThread({ fade: true }); loadChatPanel(); closeMobile(); input.focus();
+}
+$('#newChat').onclick = newChat;
+$('#search').addEventListener('input', e => { S.query = e.target.value; renderSidebar(); });
+
+/* ---------- model pill & palette ---------- */
+function renderPill() {
+  const p = S.providers.find(x => x.id === S.sel.providerId);
+  $('#pillProv').textContent = p ? p.name + ' /' : '';
+  $('#pillModel').textContent = S.sel.model || 'Choose a model';
+  $('#pillDot').classList.toggle('off', !!(p && S.modelErrors[p.id]));
+  input.placeholder = S.sel.model ? `Message ${S.sel.model}` : 'Choose a model to start';
+  syncSend();
+}
+async function loadModels(pid, force) {
+  if (S.models[pid] && !force) return;
+  S.modelLoading[pid] = true; delete S.modelErrors[pid]; if (paletteOpen()) renderPalette();
+  try { S.models[pid] = await api.providers.models(pid); }
+  catch (e) { S.modelErrors[pid] = e.message; S.models[pid] = []; }
+  finally { S.modelLoading[pid] = false; if (paletteOpen()) renderPalette(); renderPill(); if ($('#settings').classList.contains('show')) renderSettings(); }
+}
+const paletteOpen = () => $('#palette').classList.contains('show');
+let pIndex = 0, pFlat = [];
+function openPalette() {
+  if (!S.providers.length) return openSettings(null);
+  S.providers.forEach(p => loadModels(p.id));
+  $('#paletteInput').value = ''; pIndex = -1;
+  show('#palette'); renderPalette(); setTimeout(() => $('#paletteInput').focus(), 30);
+}
+function renderPalette() {
+  const q = $('#paletteInput').value.toLowerCase().trim();
+  const list = $('#paletteList'); list.innerHTML = ''; pFlat = [];
+  for (const p of S.providers) {
+    const models = (S.models[p.id] || []).filter(m => !q || m.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+    if (q && !models.length && !S.modelLoading[p.id]) continue;
+    const rb = el('button', { type: 'button', title: 'Reload models', onclick: () => loadModels(p.id, true) });
+    rb.innerHTML = (S.modelLoading[p.id] ? icon.refresh.replace('<svg', '<svg class="spin"') : icon.refresh) + (S.modelLoading[p.id] ? 'Loading' : 'Reload');
+    list.append(el('div', { class: 'p-group' }, el('span', {}, p.name), rb));
+    if (S.modelErrors[p.id]) list.append(el('div', { class: 'p-err' }, S.modelErrors[p.id]));
+    for (const m of models) {
+      const idx = pFlat.length; pFlat.push({ p, m });
+      const cur = S.sel.providerId === p.id && S.sel.model === m.id;
+      if (pIndex === -1 && cur) pIndex = idx;
+      const item = el('button', { type: 'button', role: 'option', class: 'p-item' + (cur ? ' current' : ''), 'data-i': idx, onclick: () => pickModel(p, m), onmousemove: () => setPIndex(idx) },
+        el('span', { class: 'm' }, m.id), el('span', { class: 'meta' }, m.ownedBy));
+      const ck = el('span', { class: 'check' }); ck.innerHTML = icon.check; item.append(ck);
+      list.append(item);
+    }
+  }
+  if (!pFlat.length && !Object.values(S.modelLoading).some(Boolean)) list.append(el('div', { class: 'p-empty' }, q ? `No models match “${q}”.` : 'No models yet. Check your providers in settings.'));
+  if (pIndex < 0 || pIndex >= pFlat.length) pIndex = 0;
+  setPIndex(pIndex, false);
+}
+function setPIndex(i, scroll = true) {
+  pIndex = i;
+  document.querySelectorAll('.p-item').forEach(n => n.classList.toggle('sel', +n.dataset.i === i));
+  if (scroll) { const n = document.querySelector(`.p-item[data-i="${i}"]`); n && n.scrollIntoView({ block: 'nearest' }); }
+}
+function pickModel(p, m) {
+  S.sel = { providerId: p.id, model: m.id }; renderPill(); hideAll();
+  if (S.chat) { S.chat.providerId = p.id; S.chat.model = m.id; api.chats.update(S.chat.id, { providerId: p.id, model: m.id }); }
+  if (!S.chat || !S.chat.messages.length) renderThread();
+  try { localStorage.setItem('sb:lastModel', JSON.stringify(S.sel)); } catch {}
+  input.focus();
+}
+$('#paletteInput').addEventListener('input', () => { pIndex = 0; renderPalette(); });
+$('#paletteInput').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); setPIndex(Math.min(pFlat.length - 1, pIndex + 1)); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); setPIndex(Math.max(0, pIndex - 1)); }
+  if (e.key === 'Enter' && pFlat[pIndex]) { e.preventDefault(); pickModel(pFlat[pIndex].p, pFlat[pIndex].m); }
+});
+$('#modelPill').onclick = openPalette;
+
+/* ---------- chat settings panel ---------- */
+function loadChatPanel() {
+  const c = S.chat;
+  $('#sysPrompt').value = c ? c.systemPrompt || '' : (S.draft?.systemPrompt || '');
+  $('#temp').value = c ? c.temperature : 0.7; $('#tempOut').textContent = $('#temp').value;
+  $('#ctxWindow').value = String(c ? c.contextWindow : 8192);
+  renderContext(); renderSysChip();
+}
+function renderSysChip() { const v = S.chat ? S.chat.systemPrompt : S.draft?.systemPrompt; $('#sysChipLabel').textContent = v ? 'System prompt on' : 'No system prompt'; $('#sysChip').style.color = v ? 'var(--accent)' : ''; }
+let saveT;
+function savePanel() {
+  const patch = { systemPrompt: $('#sysPrompt').value, temperature: +$('#temp').value, contextWindow: +$('#ctxWindow').value };
+  $('#tempOut').textContent = patch.temperature;
+  if (S.chat) { Object.assign(S.chat, patch); clearTimeout(saveT); saveT = setTimeout(() => api.chats.update(S.chat.id, patch), 300); }
+  else S.draft = patch;
+  renderContext(); renderSysChip();
+}
+['#sysPrompt', '#temp', '#ctxWindow'].forEach(s => $(s).addEventListener('input', savePanel));
+const openPanel = () => { loadChatPanel(); show('#chatPanel'); setTimeout(() => $('#sysPrompt').focus(), 280); };
+$('#ctxBtn').onclick = openPanel; $('#chatSettingsBtn').onclick = openPanel; $('#sysChip').onclick = openPanel;
+
+/* ---------- settings modal (providers) ---------- */
+let editing = null; // provider id or null for new
+function openSettings(pid) { editing = pid === undefined ? (S.providers[0]?.id ?? null) : pid; renderSettings(); show('#settings'); if (editing) loadModels(editing); }
+$('#openSettings').onclick = () => openSettings();
+function renderSettings() {
+  const side = $('#settingsSide'); side.innerHTML = '';
+  side.append(el('h2', {}, 'Settings'), el('div', { class: 'side-label' }, 'Providers'));
+  for (const p of S.providers) {
+    const st = S.modelErrors[p.id] ? 'err' : S.models[p.id]?.length ? 'ok' : '';
+    side.append(el('button', { class: 'side-item' + (editing === p.id ? ' active' : ''), onclick: () => { editing = p.id; renderSettings(); loadModels(p.id); } }, el('span', { class: 'dot ' + st }), p.name));
+  }
+  const add = el('button', { class: 'side-item add' + (editing === null ? ' active' : ''), onclick: () => { editing = null; renderSettings(); } }); add.innerHTML = icon.plus + 'Add provider'; side.append(add);
+  side.append(el('div', { class: 'side-label' }, 'App'));
+  side.append(el('button', { class: 'side-item' + (editing === 'appearance' ? ' active' : ''), onclick: () => { editing = 'appearance'; renderSettings(); } }, 'Appearance'));
+
+  const content = $('#settingsContent'), actions = $('#settingsActions'); content.innerHTML = ''; actions.innerHTML = '';
+  if (editing === 'appearance') {
+    $('#settingsTitle').textContent = 'Appearance';
+    const cur = currentThemePref();
+    const seg = el('div', { class: 'seg' }, ...['system', 'light', 'dark'].map(v => el('button', { class: cur === v ? 'on' : '', onclick: () => { setTheme(v); renderSettings(); } }, v[0].toUpperCase() + v.slice(1))));
+    content.append(el('div', { class: 'field' }, el('label', {}, 'Theme'), seg));
+    return;
+  }
+  const p = S.providers.find(x => x.id === editing);
+  $('#settingsTitle').textContent = p ? p.name : 'Add a provider';
+  const f = (id, label, sub, attrs) => el('div', { class: 'field' }, el('label', { for: id }, label), sub ? el('p', { class: 'sub' }, sub) : '', el('input', { class: 'input', id, ...attrs }));
+  content.append(
+    f('pvName', 'Name', 'Shown in the model picker.', { value: p?.name || '', placeholder: 'Ollama' }),
+    f('pvUrl', 'Base URL', 'The OpenAI-compatible root. Models load from {base}/models and chats go to {base}/chat/completions.', { value: p?.baseUrl || '', placeholder: 'http://localhost:11434/v1', spellcheck: 'false' }),
+    f('pvKey', 'API key', p?.hasKey ? 'A key is saved. Leave blank to keep it.' : 'Optional for local servers. Stored only in the backend database.', { type: 'password', placeholder: p?.hasKey ? '••••••••••••' : 'sk-…', autocomplete: 'off' }),
+  );
+  if (p) {
+    const box = el('div', { class: 'models-box' });
+    const n = S.models[p.id]?.length || 0;
+    const reload = el('button', { class: 'btn small', type: 'button', onclick: () => loadModels(p.id, true) }); reload.innerHTML = (S.modelLoading[p.id] ? icon.refresh.replace('<svg', '<svg class="spin"') : icon.refresh) + 'Reload';
+    box.append(el('div', { class: 'models-head' }, el('span', {}, S.modelLoading[p.id] ? 'Loading models…' : S.modelErrors[p.id] ? 'Models unavailable' : `${n} model${n === 1 ? '' : 's'} available`), reload));
+    if (S.modelErrors[p.id]) box.append(el('div', { class: 'p-err', style: 'margin:10px' }, S.modelErrors[p.id]));
+    else box.append(el('div', { class: 'models-list' }, ...(S.models[p.id] || []).map(m => el('div', { class: 'model-row' }, m.id, el('span', {}, m.ownedBy)))));
+    content.append(el('div', { class: 'field' }, el('label', {}, 'Models'), box));
+  }
+  const save = el('button', { class: 'btn primary', onclick: saveProvider }, p ? 'Save changes' : 'Add provider');
+  actions.append(save);
+  if (p) actions.append(el('button', { class: 'btn danger', style: 'margin-left:auto', onclick: () => confirmBox(`Remove ${p.name}?`, 'Chats that used it stay, but you’ll need to pick another model to continue them.', 'Remove', () => removeProvider(p)) }, 'Remove provider'));
+}
+async function saveProvider() {
+  const name = $('#pvName').value.trim(), baseUrl = $('#pvUrl').value.trim().replace(/\/+$/, ''), key = $('#pvKey').value;
+  if (!name || !baseUrl) { toast('Add a name and a base URL first'); return; }
+  if (!/^https?:\/\//.test(baseUrl)) { toast('The base URL needs to start with http:// or https://'); return; }
+  const data = { name, baseUrl }; if (key) data.apiKey = key;
+  let p;
+  if (editing && editing !== 'appearance') { p = await api.providers.update(editing, data); delete S.models[p.id]; toast('Saved changes'); }
+  else { p = await api.providers.create(data); toast(`Added ${p.name}`); }
+  S.providers = await api.providers.list(); editing = p.id; renderSettings(); await loadModels(p.id, true);
+  if (!S.sel.model && S.models[p.id]?.length) { S.sel = { providerId: p.id, model: S.models[p.id][0].id }; renderPill(); renderThread(); }
+}
+async function removeProvider(p) {
+  await api.providers.remove(p.id); S.providers = await api.providers.list(); delete S.models[p.id];
+  if (S.sel.providerId === p.id) { S.sel = { providerId: null, model: null }; renderPill(); }
+  editing = S.providers[0]?.id ?? null; renderSettings(); toast(`Removed ${p.name}`);
+  if (!S.chat) renderThread();
+}
+
+/* ---------- overlays ---------- */
+function show(sel) { hideAll(true); $(sel).classList.add('show'); $('#scrim').classList.add('show'); }
+function hideAll(keepScrim) { ['#palette', '#chatPanel', '#settings'].forEach(s => $(s).classList.remove('show')); if (!keepScrim) $('#scrim').classList.remove('show'); hideMenu(); }
+$('#scrim').onclick = () => { hideAll(); closeMobile(); };
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => hideAll());
+
+function showMenu(anchor, items) {
+  const m = $('#menu'); m.innerHTML = '';
+  for (const it of items) { const b = el('button', { class: it.danger ? 'danger' : '', onclick: () => { hideMenu(); it.run(); } }); b.innerHTML = it.icon + it.label; m.append(b); }
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.min(r.left, innerWidth - 180) + 'px'; m.style.top = (r.bottom + 4) + 'px';
+  requestAnimationFrame(() => m.classList.add('show'));
+  setTimeout(() => document.addEventListener('click', hideMenu, { once: true }), 0);
+}
+function hideMenu() { $('#menu').classList.remove('show'); }
+function toast(msg, action, fn) {
+  const t = el('div', { class: 'toast' }, msg);
+  if (action) t.append(el('button', { onclick: () => { fn(); kill(); } }, action));
+  $('#toasts').append(t);
+  const kill = () => { t.classList.add('out'); setTimeout(() => t.remove(), 200); };
+  setTimeout(kill, action ? 5000 : 2600);
+}
+function confirmBox(title, text, okLabel, ok) {
+  const scr = el('div', { class: 'scrim show', style: 'z-index:79' });
+  const box = el('div', { class: 'confirm', role: 'alertdialog' }, el('h3', {}, title), el('p', {}, text),
+    el('div', { class: 'row' }, el('button', { class: 'btn', onclick: () => close() }, 'Cancel'), el('button', { class: 'btn primary', style: 'background:var(--danger);border-color:var(--danger)', onclick: () => { close(); ok(); } }, okLabel)));
+  const close = () => { scr.remove(); box.remove(); };
+  scr.onclick = close; document.body.append(scr, box); box.querySelector('.primary').focus();
+}
+
+/* ---------- sidebar toggle / theme ---------- */
+const isMobile = () => matchMedia('(max-width:820px)').matches;
+function toggleSidebar() {
+  if (isMobile()) { const open = $('#app').classList.toggle('mobile-open'); $('#scrim').classList.toggle('show', open); }
+  else $('#app').classList.toggle('collapsed');
+}
+function closeMobile() { if ($('#app').classList.contains('mobile-open')) { $('#app').classList.remove('mobile-open'); $('#scrim').classList.remove('show'); } }
+$('#toggleSidebar').onclick = toggleSidebar;
+function currentThemePref() { try { return localStorage.getItem('sb:theme') || 'system'; } catch { return 'system'; } }
+function applyTheme() { const p = currentThemePref(); const dark = p === 'dark' || (p === 'system' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }
+function setTheme(v) { try { localStorage.setItem('sb:theme', v); } catch {} applyTheme(); }
+$('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+applyTheme();
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown', e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); paletteOpen() ? hideAll() : openPalette(); }
+  else if (mod && e.shiftKey && e.key.toLowerCase() === 'o') { e.preventDefault(); newChat(); }
+  else if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleSidebar(); }
+  else if (e.key === 'Escape') {
+    if (document.querySelector('.confirm')) return;
+    if (document.querySelector('.scrim.show')) { hideAll(); closeMobile(); }
+    else if (S.streaming) S.streaming.abort();
+  }
+  else if (!mod && e.key.length === 1 && document.activeElement === document.body) input.focus();
+});
+
+/* ---------- boot ---------- */
+window.addEventListener('unhandledrejection', e => { toast(e.reason && e.reason.message ? e.reason.message : 'Something went wrong.'); });
+(async () => {
+  try { S.providers = await api.providers.list(); S.chats = await api.chats.list(); }
+  catch (e) {
+    $('#thread').replaceChildren(el('div', { class: 'welcome' }, el('h1', {}, 'The backend isn’t answering'), el('p', {}, e.message + ' Start it, then reload this page.'), el('button', { class: 'btn primary', onclick: () => location.reload() }, 'Reload')));
+    return;
+  }
+  let last; try { last = JSON.parse(localStorage.getItem('sb:lastModel')); } catch {}
+  if (last && S.providers.some(p => p.id === last.providerId)) S.sel = last;
+  else if (S.providers[0]) { await loadModels(S.providers[0].id); const m = S.models[S.providers[0].id]?.[0]; if (m) S.sel = { providerId: S.providers[0].id, model: m.id }; }
+  S.providers.forEach(p => loadModels(p.id));
+  renderPill(); renderSidebar(); renderThread(); loadChatPanel();
+  input.focus();
+})();
+</script>
+</body>
+</html>
