@@ -1,0 +1,8 @@
+- Make the context window larger than 128k tokens.
+- Save the settings to the database as well.
+- Make windows exits cleaner
+- make an executable that can be distributed.
+- Migrate backend to uv
+- Make the chat name be a summary of the chat, not the message that was sent.
+- Add tool calls to create artifacts and code snippets
+- Make code highlighting work even in the chat box.
