@@ -6,14 +6,16 @@ the frontend is static files that only talk to the backend's `/api`.
 
 ```
 switchboard/
-├── backend/            Python (FastAPI) — API, SQLite, calls to providers
-│   ├── switchboard/
-│   │   ├── app.py      HTTP routes
-│   │   ├── db.py       SQLite schema and queries
-│   │   ├── llm.py      GET {base}/models, streaming POST {base}/chat/completions
-│   │   └── context.py  decides which messages fit the context window
-│   ├── tests/          API tests + a fake OpenAI server
-│   └── data/           switchboard.db is created here on first run
+├── backend/                  Go — API, SQLite, calls to providers
+│   ├── main.go               flags and startup
+│   ├── internal/
+│   │   ├── server/           HTTP routes (+ API tests)
+│   │   ├── store/            SQLite schema and queries
+│   │   ├── llm/              openai-go SDK: GET {base}/models, streaming POST {base}/responses
+│   │   ├── prompt/           decides which messages fit the context window
+│   │   └── fakeprovider/     a fake OpenAI-compatible server for tests
+│   ├── cmd/fakeprovider/     the same fake server as a program, for UI work
+│   └── data/                 switchboard.db is created here on first run
 └── frontend/           static UI (no build step)
     ├── index.html
     ├── js/api.js       the only file that talks to the backend
@@ -23,7 +25,7 @@ switchboard/
 
 ## Run it
 
-Needs Python 3.10+.
+Needs Go 1.26+ to build (https://go.dev/dl/).
 
 **macOS / Linux**
 ```bash
@@ -35,21 +37,33 @@ Needs Python 3.10+.
 run.bat
 ```
 
-Both create a virtual environment in `backend/.venv` the first time, install three packages,
-and start the server. Then open **http://localhost:8787**.
+Both build `backend/switchboard` (dependencies are downloaded the first time) and start it.
+Then open **http://localhost:8787**.
 
 Manual equivalent:
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m switchboard
+go build -o switchboard . && ./switchboard
 ```
+
+The binary has no runtime dependencies (the SQLite driver is pure Go, no cgo), so it
+cross-compiles with `GOOS=windows GOARCH=amd64 go build` and friends.
+
+## Responses API
+
+Replies use the OpenAI **Responses API** (`POST {base}/responses`, streamed) through the official
+[openai-go](https://github.com/openai/openai-go) SDK. The chat's system prompt is sent as `instructions`,
+the history as input messages, and `store: false` so the provider keeps no copy. A provider that only
+has Chat Completions will answer 404, and the error says so. If that happens, update the server
+or check its docs for `/v1/responses` support.
+
+`OPENAI_API_KEY`, `OPENAI_BASE_URL` and the other `OPENAI_*` variables are ignored: each provider
+only gets the key saved for it.
 
 ## Add a provider
 
 Open **Providers & settings** (bottom left) → **Add provider**, then enter a name and the base URL.
-The base URL is the part before `/models` and `/chat/completions`:
+The base URL is the part before `/models` and `/responses`:
 
 | Provider   | Base URL                        | API key |
 |------------|---------------------------------|---------|
@@ -72,7 +86,7 @@ API keys are kept in the SQLite database and never sent to the browser.
 | `--frontend`   | `SWITCHBOARD_FRONTEND`  | `../frontend` (`""` = API only) |
 |                | `SWITCHBOARD_CORS`      | `*`                         |
 
-Example: `python -m switchboard --port 9000 --db ~/chats.db`
+Example: `./switchboard --port 9000 --db ~/chats.db`
 
 ## Running the frontend separately
 
@@ -95,8 +109,6 @@ Set the window per chat from the ring in the top bar.
 
 ## API
 
-Interactive docs are at **http://localhost:8787/api/docs**.
-
 | Method | Path | |
 |---|---|---|
 | GET/POST | `/api/providers` | list / add (`name`, `baseUrl`, `apiKey?`) |
@@ -114,8 +126,8 @@ Closing the connection stops generation; the partial reply is saved and marked a
 ## Tests
 
 ```bash
-cd backend && pip install pytest && python -m pytest tests
+cd backend && go test ./...
 ```
 
-`tests/fake_openai.py` is a small fake provider you can also point the UI at
-(`python tests/fake_openai.py 9100` → base URL `http://127.0.0.1:9100/v1`).
+The tests run against a small fake provider that speaks the streaming Responses API. You can also
+point the UI at it (`go run ./cmd/fakeprovider 9100` → base URL `http://127.0.0.1:9100/v1`).

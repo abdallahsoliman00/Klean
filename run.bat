@@ -1,14 +1,14 @@
 @echo off
 rem Starts Switchboard at http://localhost:8787 (pass flags through, e.g. run.bat --port 9000)
 cd /d "%~dp0backend"
-if not exist .venv (
-  echo First run: setting up Python environment...
-  python -m venv .venv || goto :error
-  .venv\Scripts\python -m pip install -q --upgrade pip
-  .venv\Scripts\python -m pip install -q -r requirements.txt || goto :error
-)
-.venv\Scripts\python -m switchboard %*
+where go >nul 2>nul || goto :nogo
+go build -o switchboard.exe . || goto :error
+switchboard.exe %*
+goto :eof
+:nogo
+echo Go isn't installed. Get Go 1.26 or newer from https://go.dev/dl/
+pause
 goto :eof
 :error
-echo Setup failed. Make sure Python 3.10+ is installed and on your PATH.
+echo Build failed.
 pause
