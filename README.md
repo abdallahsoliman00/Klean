@@ -1,26 +1,29 @@
 # Switchboard
 
 A local chat UI for any OpenAI-compatible server (Ollama, LM Studio, vLLM, llama.cpp, OpenRouter, OpenAI…).
-The frontend and backend are separate: the backend owns the chats, context and provider keys (SQLite);
+It ships as **one executable** with the UI built in: copy it anywhere, double-click it, and it opens
+in your browser. The backend owns the chats, context and provider keys (SQLite);
 the frontend is static files that only talk to the backend's `/api`.
 
 ```
 switchboard/
+├── go.mod                    one Go module for the whole repo (so the UI can be embedded)
 ├── backend/                  Go — API, SQLite, calls to providers
 │   ├── main.go               flags and startup
 │   ├── internal/
 │   │   ├── server/           HTTP routes (+ API tests)
-│   │   ├── store/            SQLite schema and queries
+│   │   ├── store/            SQLite schema, queries, and where the database lives
 │   │   ├── llm/              openai-go SDK: GET {base}/models, streaming POST {base}/responses
 │   │   ├── prompt/           decides which messages fit the context window
+│   │   ├── launch/           opens the browser, and a terminal window when double-clicked
 │   │   └── fakeprovider/     a fake OpenAI-compatible server for tests
-│   ├── cmd/fakeprovider/     the same fake server as a program, for UI work
-│   └── data/                 switchboard.db is created here on first run
-└── frontend/           static UI (no build step)
+│   └── cmd/fakeprovider/     the same fake server as a program, for UI work
+└── frontend/                 static UI (no build step), embedded into the executable
+    ├── embed.go              tells Go which files to embed
     ├── index.html
-    ├── js/api.js       the only file that talks to the backend
-    ├── js/api.mock.js  in-memory stand-in, for UI work without a backend
-    └── vendor/         markdown, sanitiser, highlighter, fonts (works offline)
+    ├── js/api.js             the only file that talks to the backend
+    ├── js/api.mock.js        in-memory stand-in, for UI work without a backend
+    └── vendor/               markdown, sanitiser, highlighter, fonts (works offline)
 ```
 
 ## Run it
@@ -37,17 +40,30 @@ Needs Go 1.26+ to build (https://go.dev/dl/).
 run.bat
 ```
 
-Both build `backend/switchboard` (dependencies are downloaded the first time) and start it.
-Then open **http://localhost:8787**.
+Both build `./switchboard` (dependencies are downloaded the first time), start it, and open
+**http://localhost:8787** in your browser. Manual equivalent: `go build -o switchboard ./backend && ./switchboard`
 
-Manual equivalent:
+### Build for distribution
+
 ```bash
-cd backend
-go build -o switchboard . && ./switchboard
+./build.sh
 ```
 
-The binary has no runtime dependencies (the SQLite driver is pure Go, no cgo), so it
-cross-compiles with `GOOS=windows GOARCH=amd64 go build` and friends.
+puts a single self-contained executable per platform in `dist/` (Linux, macOS and Windows; amd64
+and arm64). Each one carries the UI inside it and needs nothing else installed: the SQLite driver
+is pure Go, so there's no cgo.
+
+### What happens when it starts
+
+- **The browser opens** at the app's address. Use `--no-browser` to skip that.
+- **Double-clicked in a file manager**, it opens its own terminal window showing the address and
+  where the database is. **Closing that window stops Switchboard** and frees the port. On Windows,
+  Explorer gives it a console window. On macOS, Finder opens it in Terminal. On Linux, it finds your
+  desktop's terminal: `$TERMINAL`, `xdg-terminal-exec`, Konsole, Ptyxis, GNOME Terminal and others.
+- **Started from a terminal**, it stays in that terminal; Ctrl+C stops it.
+- **Already running?** Starting it again just opens the browser at the running copy.
+- If an error stops it in its own window, the window waits for Enter so you can read why.
+- For a service or autostart entry, use `--headless`: no window, no browser.
 
 ## Responses API
 
@@ -82,16 +98,37 @@ API keys are kept in the SQLite database and never sent to the browser.
 |----------------|-------------------------|-----------------------------|
 | `--port`       | `SWITCHBOARD_PORT`      | `8787`                      |
 | `--host`       | `SWITCHBOARD_HOST`      | `127.0.0.1` (this computer only) |
-| `--db`         | `SWITCHBOARD_DB`        | `backend/data/switchboard.db` |
-| `--frontend`   | `SWITCHBOARD_FRONTEND`  | `../frontend` (`""` = API only) |
+| `--db`         | `SWITCHBOARD_DB`        | per-user data folder, below |
+| `--frontend`   | `SWITCHBOARD_FRONTEND`  | the built-in UI; a folder path serves that instead, `none` = API only |
+| `--no-browser` | `SWITCHBOARD_NO_BROWSER=1` | off                      |
+| `--headless`   |                         | off (no browser, no terminal window) |
 |                | `SWITCHBOARD_CORS`      | `*`                         |
 
 Example: `./switchboard --port 9000 --db ~/chats.db`
 
+### Where chats are stored
+
+The database lives in a per-user folder rather than next to the executable, so the binary can be
+moved, renamed or replaced without losing anything:
+
+| OS      | Default database |
+|---------|------------------|
+| Linux   | `~/.local/share/switchboard/switchboard.db` (or `$XDG_DATA_HOME/switchboard/`) |
+| macOS   | `~/Library/Application Support/Switchboard/switchboard.db` |
+| Windows | `%LOCALAPPDATA%\Switchboard\switchboard.db` |
+
+`--db` or `SWITCHBOARD_DB` puts it anywhere else. To move chats from an older version, copy its
+`backend/data/switchboard.db` to the path above while Switchboard is stopped.
+
+### Working on the UI
+
+The executable serves the copy of `frontend/` it was built with. To see edits without rebuilding,
+serve the folder directly: `go run ./backend --frontend frontend`, then reload the page.
+
 ## Running the frontend separately
 
 The backend serves the frontend by default. To host the UI elsewhere (another port, a dev server),
-start the backend with `--frontend ""` and set the backend address before `js/api.js` loads:
+start the backend with `--frontend none` and set the backend address before `js/api.js` loads:
 
 ```html
 <script>window.SWITCHBOARD_API = "http://localhost:8787";</script>
@@ -126,8 +163,8 @@ Closing the connection stops generation; the partial reply is saved and marked a
 ## Tests
 
 ```bash
-cd backend && go test ./...
+go test ./...
 ```
 
 The tests run against a small fake provider that speaks the streaming Responses API. You can also
-point the UI at it (`go run ./cmd/fakeprovider 9100` → base URL `http://127.0.0.1:9100/v1`).
+point the UI at it (`go run ./backend/cmd/fakeprovider 9100` → base URL `http://127.0.0.1:9100/v1`).

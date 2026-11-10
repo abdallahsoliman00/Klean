@@ -1,8 +1,9 @@
 @echo off
-rem Starts Switchboard at http://localhost:8787 (pass flags through, e.g. run.bat --port 9000)
-cd /d "%~dp0backend"
+rem Builds Switchboard and starts it at http://localhost:8787, opening the browser.
+rem Flags pass through, e.g. run.bat --port 9000 --no-browser
+cd /d "%~dp0"
 where go >nul 2>nul || goto :nogo
-go build -o switchboard.exe . || goto :error
+go build -o switchboard.exe ./backend || goto :error
 switchboard.exe %*
 goto :eof
 :nogo

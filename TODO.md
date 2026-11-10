@@ -1,22 +1,23 @@
-- Change the name to something more interesting than switchboard.
-- Make the context window larger than 128k tokens.
-- Save the settings to the database as well.
-- Make an executable that can be distributed.
-- Make the chat name be a summary of the chat, not the message that was sent.
-- Add tool calls to create artifacts and code snippets. Ideas:
+- [] Change the name to something more interesting than switchboard.
+- [] Make the context window larger than 128k tokens.
+- [] Save the settings to the database as well.
+- [x] Make an executable that can be distributed.
+- [] Make the chat name be a summary of the chat, not the message that was sent.
+- [] Add tool calls to create artifacts and code snippets. Ideas:
     - Code snippets in the sidebar
     - Artifacts
     - Ask questions
-    - Webs search
-- Make code highlighting work even in the chat box.
-- Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available.
-- Give the usert the option to select from different code coloschemes as well.
-- Favourite chats.
-- Settings don't take effect and system prompts get deleted.
-- Allow for multiple system prompts. (Make it a config)
-- Make a CI/CD pipeline that has the most recent version of the tool available, and make the application download the most recent version of the tool if one is available.
-- Possibly migrate the backend to Rust or Go while it's still small to make cross-compilation to other languages easier than Python.
-- When switching models in the middle of a conversation, find out which model is the one actually doing the talking.
-- Add highlight and quote ask
-- Make a tree where you can wander off on tangents and come back.
-- Add using images. The responses API now supports this. Also migrate from the completions, and ensure the OpenAI SDK is used.
+    - Web search
+- [] Make code syntax highlighting work even in the chat box.
+- [] Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available.
+- [] Give the user the option to select from different code coloschemes as well.
+- [] Favourite chats.
+- [] Settings don't take effect and system prompts get deleted.
+- [] Allow for multiple system prompts. (Make it a config)
+- [] Make a CI/CD pipeline that has the most recent version of the tool available, and make the application download the most recent version of the tool if one is available.
+- [x] Possibly migrate the backend to Rust or Go while it's still small to make cross-compilation to other languages easier than Python.
+- [] When switching models in the middle of a conversation, find out which model is the one actually doing the talking.
+- [] Add highlight and quote ask
+- [] Add using images. The responses API now supports this. Also migrate from the completions, and ensure the OpenAI SDK is used.
+- [x] Embed the frontend in the executable.
+- [] Make a tree where you can wander off on tangents and come back.

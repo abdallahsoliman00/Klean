@@ -1,31 +1,38 @@
-// Switchboard backend. Run with:  go run .  (from the backend folder)
+// Switchboard: a local chat UI for OpenAI-compatible servers, in one executable.
+//
+// Build from the repository root:  go build -o switchboard ./backend
 //
 // Settings (flags or environment variables):
 //
 //	--host / SWITCHBOARD_HOST          default 127.0.0.1
 //	--port / SWITCHBOARD_PORT          default 8787
-//	--db   / SWITCHBOARD_DB            default ./data/switchboard.db
-//	--frontend / SWITCHBOARD_FRONTEND  default ../frontend ("" to serve the API only)
+//	--db   / SWITCHBOARD_DB            default: per-user data folder (see store.DefaultPath)
+//	--frontend / SWITCHBOARD_FRONTEND  default: the UI built into the executable;
+//	                                   a folder serves that instead, "none" serves only the API
+//	--no-browser / SWITCHBOARD_NO_BROWSER=1  don't open the browser on start
+//	--headless                         no browser and no terminal window (services, autostart)
 //	SWITCHBOARD_CORS                   default * (comma-separated origins)
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
-	"switchboard/internal/server"
-	"switchboard/internal/store"
+	"switchboard/backend/internal/launch"
+	"switchboard/backend/internal/server"
+	"switchboard/backend/internal/store"
+	"switchboard/frontend"
 )
 
 func env(key, fallback string) string {
@@ -35,64 +42,130 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-// baseDir is the backend folder: the working directory under `go run`,
-// otherwise the folder holding the executable.
-func baseDir() string {
-	if exe, err := os.Executable(); err == nil {
-		dir := filepath.Dir(exe)
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		if _, err := os.Stat(filepath.Join(dir, "..", "frontend")); err == nil {
-			return dir
-		}
+func main() {
+	// Double-clicked in a file manager: run inside a terminal window instead,
+	// so closing that window stops the server.
+	if !hasFlag("headless") && launch.NeedsTerminal() && launch.OpenInTerminal() {
+		return
 	}
-	wd, _ := os.Getwd()
-	return wd
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "\n  %v\n", err)
+		launch.PauseIfOwnWindow()
+		os.Exit(1)
+	}
 }
 
-func main() {
-	here := baseDir()
+func run() error {
 	port, err := strconv.Atoi(env("SWITCHBOARD_PORT", "8787"))
 	if err != nil {
-		log.Fatalf("SWITCHBOARD_PORT must be a number")
+		return errors.New("SWITCHBOARD_PORT must be a number")
+	}
+	defaultDB := os.Getenv("SWITCHBOARD_DB")
+	if defaultDB == "" {
+		if defaultDB, err = store.DefaultPath(); err != nil {
+			return err
+		}
 	}
 	host := flag.String("host", env("SWITCHBOARD_HOST", "127.0.0.1"), "address to listen on")
 	flag.IntVar(&port, "port", port, "port to listen on")
-	dbPath := flag.String("db", env("SWITCHBOARD_DB", filepath.Join(here, "data", "switchboard.db")), "SQLite database file")
-	frontend := flag.String("frontend", env("SWITCHBOARD_FRONTEND", filepath.Join(here, "..", "frontend")), `frontend folder ("" to serve the API only)`)
+	dbPath := flag.String("db", defaultDB, "SQLite database file")
+	frontendDir := flag.String("frontend", env("SWITCHBOARD_FRONTEND", ""),
+		`serve the UI from this folder instead of the built-in copy ("none" = API only)`)
+	noBrowser := flag.Bool("no-browser", env("SWITCHBOARD_NO_BROWSER", "") != "", "don't open the browser on start")
+	headless := flag.Bool("headless", false, "don't open a browser or a terminal window (for services and autostart)")
 	flag.Parse()
+	*noBrowser = *noBrowser || *headless
+
+	var static fs.FS = frontend.Files
+	switch *frontendDir {
+	case "":
+	case "none":
+		static = nil
+	default:
+		if st, err := os.Stat(*frontendDir); err != nil || !st.IsDir() {
+			return fmt.Errorf("--frontend %s is not a folder", *frontendDir)
+		}
+		static = os.DirFS(*frontendDir)
+	}
+
+	shown := *host
+	if shown == "127.0.0.1" || shown == "0.0.0.0" || shown == "" || shown == "::" {
+		shown = "localhost"
+	}
+	url := fmt.Sprintf("http://%s/", net.JoinHostPort(shown, strconv.Itoa(port)))
+	addr := net.JoinHostPort(*host, strconv.Itoa(port))
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		// (The errno for "address in use" differs per OS, so ask the port instead.)
+		if !isSwitchboard(url) {
+			return fmt.Errorf("can't listen on port %d (%v).\n  If another program uses it, start with --port to pick another one", port, err)
+		}
+		// Already running (perhaps in another window): just show it.
+		fmt.Printf("\n  Switchboard is already running at %s\n\n", url)
+		if static != nil && !*noBrowser {
+			_ = launch.OpenBrowser(url)
+		}
+		return nil
+	}
 
 	db, err := store.Open(*dbPath)
 	if err != nil {
-		log.Fatalf("opening database %s: %v", *dbPath, err)
+		ln.Close()
+		return fmt.Errorf("opening database %s: %w", *dbPath, err)
 	}
 	defer db.Close()
 
 	srv := &http.Server{
-		Addr:              net.JoinHostPort(*host, strconv.Itoa(port)),
-		Handler:           server.New(db, *frontend, env("SWITCHBOARD_CORS", "*")),
+		Handler:           server.New(db, static, env("SWITCHBOARD_CORS", "*")),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	ln, err := net.Listen("tcp", srv.Addr)
-	if err != nil {
-		log.Fatalf("%v", err)
+	fmt.Printf("\n  Switchboard is running at %s\n  Database: %s\n", url, *dbPath)
+	if launch.OwnsWindow() {
+		fmt.Print("\n  Closing this window stops Switchboard.\n\n")
+	} else {
+		fmt.Print("\n  Press Ctrl+C to stop.\n\n")
 	}
-	shown := *host
-	if shown == "127.0.0.1" || shown == "0.0.0.0" || shown == "" {
-		shown = "localhost"
+	if static != nil && !*noBrowser {
+		// The listener is already open, so the page can't load before the server is up.
+		if err := launch.OpenBrowser(url); err != nil {
+			fmt.Printf("  Couldn't open a browser (%v). Open %s yourself.\n\n", err, url)
+		}
 	}
-	fmt.Printf("\n  Switchboard is running at http://%s:%d\n  Database: %s\n\n", shown, port, *dbPath)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// SIGHUP arrives when the terminal window is closed.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 	go func() {
 		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
 	}()
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("%v", err)
+		return err
 	}
+	return nil
+}
+
+// hasFlag reports whether a boolean flag was given, before flags are parsed.
+func hasFlag(name string) bool {
+	for _, a := range os.Args[1:] {
+		if a == "-"+name || a == "--"+name || a == "--"+name+"=true" || a == "-"+name+"=true" {
+			return true
+		}
+	}
+	return false
+}
+
+// isSwitchboard reports whether a Switchboard server answers at url.
+func isSwitchboard(url string) bool {
+	client := http.Client{Timeout: 2 * time.Second}
+	res, err := client.Get(url + "api/health")
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+	var body struct{ App string }
+	return json.NewDecoder(res.Body).Decode(&body) == nil && body.App == "switchboard"
 }

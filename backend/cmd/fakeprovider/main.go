@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"switchboard/internal/fakeprovider"
+	"switchboard/backend/internal/fakeprovider"
 )
 
 func main() {

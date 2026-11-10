@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"strings"
 
-	"switchboard/internal/llm"
-	"switchboard/internal/prompt"
-	"switchboard/internal/store"
+	"switchboard/backend/internal/llm"
+	"switchboard/backend/internal/prompt"
+	"switchboard/backend/internal/store"
 )
 
 // opt records whether a JSON field was present and whether it was null,

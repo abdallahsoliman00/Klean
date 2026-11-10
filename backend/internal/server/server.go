@@ -6,27 +6,29 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"unicode/utf8"
 
-	"switchboard/internal/store"
+	"switchboard/backend/internal/store"
 )
 
 type Server struct {
 	db *store.DB
 }
 
-// New returns the HTTP handler. frontendDir may be "" to serve only the API.
-// corsOrigins is a comma-separated list, or "*".
-func New(db *store.DB, frontendDir, corsOrigins string) http.Handler {
+// New returns the HTTP handler. static holds the frontend (index.html at its
+// root), or is nil to serve only the API. corsOrigins is a comma-separated
+// list, or "*".
+func New(db *store.DB, static fs.FS, corsOrigins string) http.Handler {
 	s := &Server{db: db}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]bool{"ok": true})
+		// "app" lets a second copy recognise one that is already running.
+		writeJSON(w, 200, map[string]any{"ok": true, "app": "switchboard"})
 	})
 
 	mux.HandleFunc("GET /api/providers", s.listProviders)
@@ -46,10 +48,8 @@ func New(db *store.DB, frontendDir, corsOrigins string) http.Handler {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "Not found.")
 	})
-	if frontendDir != "" {
-		if st, err := os.Stat(frontendDir); err == nil && st.IsDir() {
-			mux.Handle("/", http.FileServer(http.Dir(frontendDir)))
-		}
+	if static != nil {
+		mux.Handle("/", http.FileServer(http.FS(static)))
 	}
 	return cors(mux, corsOrigins)
 }

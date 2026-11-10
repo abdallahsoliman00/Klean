@@ -14,9 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"switchboard/internal/fakeprovider"
-	"switchboard/internal/server"
-	"switchboard/internal/store"
+	"switchboard/backend/internal/fakeprovider"
+	"switchboard/backend/internal/server"
+	"switchboard/backend/internal/store"
+	"switchboard/frontend"
 )
 
 type env struct {
@@ -35,7 +36,7 @@ func setup(t *testing.T) *env {
 	t.Cleanup(func() { db.Close() })
 	fake := fakeprovider.New()
 	up := httptest.NewServer(fake.Handler())
-	api := httptest.NewServer(server.New(db, "", "*"))
+	api := httptest.NewServer(server.New(db, nil, "*"))
 	t.Cleanup(func() { api.Close(); up.Close() })
 	return &env{t, api, fake, up.URL + "/v1"}
 }
@@ -456,4 +457,36 @@ func rolesOf(ms []message) string {
 		r[i] = m.Role
 	}
 	return strings.Join(r, ",")
+}
+
+func TestServesEmbeddedFrontend(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	srv := httptest.NewServer(server.New(db, frontend.Files, "*"))
+	defer srv.Close()
+	for path, want := range map[string]string{
+		"/":                        `src="js/api.js"`,
+		"/js/api.js":               "SwitchboardAPI",
+		"/vendor/highlight.min.js": "hljs",
+	} {
+		res, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode != 200 || !strings.Contains(string(body), want) {
+			t.Errorf("GET %s: %d, missing %q", path, res.StatusCode, want)
+		}
+	}
+	var health map[string]any
+	res, _ := http.Get(srv.URL + "/api/health")
+	_ = json.NewDecoder(res.Body).Decode(&health)
+	res.Body.Close()
+	if health["app"] != "switchboard" {
+		t.Errorf("health: %v", health)
+	}
 }
