@@ -118,9 +118,10 @@ type message struct {
 }
 
 type chat struct {
-	ID       string    `json:"id"`
-	Title    string    `json:"title"`
-	Messages []message `json:"messages"`
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
+	ContextWindow int       `json:"contextWindow"`
+	Messages      []message `json:"messages"`
 }
 
 func TestProviderCRUDAndModels(t *testing.T) {
@@ -202,6 +203,9 @@ func TestChatFlow(t *testing.T) {
 	e.do("POST", "/providers", map[string]any{"name": "Fake", "baseUrl": e.base}, &p)
 	var c chat
 	e.do("POST", "/chats", map[string]any{"providerId": p.ID, "model": "fake-small", "systemPrompt": "Be brief."}, &c)
+	if c.ContextWindow != store.DefaultContextWindow {
+		t.Fatalf("new chat context window: got %d, want %d", c.ContextWindow, store.DefaultContextWindow)
+	}
 	send := func(extra map[string]any) []event {
 		body := map[string]any{"providerId": p.ID, "model": "fake-small"}
 		for k, v := range extra {

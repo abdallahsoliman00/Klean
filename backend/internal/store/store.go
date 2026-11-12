@@ -15,7 +15,10 @@ import (
 	_ "modernc.org/sqlite" // pure-Go driver, registers "sqlite"
 )
 
-const schema = `
+// DefaultContextWindow is the context window assigned to new chats.
+var DefaultContextWindow = 1_048_576
+
+var schema = fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS providers (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
@@ -31,7 +34,7 @@ CREATE TABLE IF NOT EXISTS chats (
     model           TEXT,
     system_prompt   TEXT NOT NULL DEFAULT '',
     temperature     REAL NOT NULL DEFAULT 0.7,
-    context_window  INTEGER NOT NULL DEFAULT 8192,
+    context_window  INTEGER NOT NULL DEFAULT %d,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
     deleted_at      INTEGER
@@ -70,7 +73,7 @@ CREATE TABLE IF NOT EXISTS settings (
     key    TEXT PRIMARY KEY,
     value  TEXT NOT NULL
 );
-`
+`, DefaultContextWindow)
 
 // Columns added after the first release. CREATE TABLE IF NOT EXISTS leaves an
 // existing table as it is, so these are added to older databases on open.

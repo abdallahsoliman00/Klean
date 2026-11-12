@@ -1,5 +1,5 @@
 - [x] Change the name to something more interesting than switchboard. (Now Klean.)
-- [] Make the context window larger than 128k tokens.
+- [x] Make the context window larger than 128k tokens.
 - [] Save the settings to the database as well.
 - [x] Make an executable that can be distributed.
 - [] Make the chat name be a summary of the chat, not the message that was sent.
@@ -19,5 +19,8 @@
 - [] When switching models in the middle of a conversation, find out which model is the one actually doing the talking.
 - [] Add highlight and quote ask
 - [] Add using images. The responses API now supports this. Also migrate from the completions, and ensure the OpenAI SDK is used.
+- [] Add file uploads
+- [] Add file creation (not just markdown files)
 - [x] Embed the frontend in the executable.
 - [] Make a tree where you can wander off on tangents and come back.
+- [] If an agent loops for too long, it stops. Give it a longer loop time.

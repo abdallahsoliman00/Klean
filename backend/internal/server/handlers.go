@@ -156,7 +156,7 @@ func (s *Server) createChat(w http.ResponseWriter, r *http.Request) {
 		n := store.NewChat{
 			ProviderID: body.ProviderID.value(), Model: body.Model.value(),
 			Title: body.Title.V, SystemPrompt: body.SystemPrompt.V,
-			Temperature: 0.7, ContextWindow: 8192,
+			Temperature: 0.7, ContextWindow: store.DefaultContextWindow,
 		}
 		if t := body.Temperature.value(); t != nil {
 			n.Temperature = *t
