@@ -16,8 +16,14 @@
     } catch {
       throw new Error(OFFLINE);
     }
-    if (!res.ok) throw new Error(await errorText(res));
+    if (!res.ok) throw await httpError(res);
     return res.status === 204 ? null : res.json();
+  }
+  /* Errors from the backend carry the HTTP status, so callers can tell "already gone" from a real failure. */
+  async function httpError(res) {
+    const e = new Error(await errorText(res));
+    e.status = res.status;
+    return e;
   }
   async function errorText(res) {
     try {
@@ -28,19 +34,33 @@
     return `Request failed (${res.status}).`;
   }
 
-  /* Reads the Server-Sent Events stream from POST /chats/:id/messages. */
-  async function send(chatId, body, { onUser, onToken, signal } = {}) {
-    let text = "";
-    const stopped = () => ({
-      message: {
-        id: "local-" + Date.now(),
-        role: "assistant",
-        model: body.model,
-        content: text,
-        stopped: true,
-      },
-      title: null,
-    });
+  /* Reads the Server-Sent Events stream from POST /chats/:id/messages.
+     body may carry `tools` (enabled groups) and `answer` ({callId, text}, replying to an ask_user call).
+     Callbacks: onUser, onAnswered, onToken, onToolStart, onToolRun, onToolEnd, onArtifact.
+     Parts are collected here too, so a reply stopped locally keeps what already arrived. */
+  async function send(chatId, body, cb = {}) {
+    const { signal } = cb;
+    const parts = [];
+    const addText = (delta) => {
+      const last = parts[parts.length - 1];
+      if (last && last.type === "text") last.text += delta;
+      else parts.push({ type: "text", text: delta });
+    };
+    const stopped = () => {
+      // tool calls that never finished are not saved by the backend either
+      const kept = parts.filter((p) => p.type === "text" || p.status);
+      return {
+        message: {
+          id: "local-" + Date.now(),
+          role: "assistant",
+          model: body.model,
+          content: kept.filter((p) => p.type === "text").map((p) => p.text).join(""),
+          parts: kept,
+          stopped: true,
+        },
+        title: null,
+      };
+    };
     let res;
     try {
       res = await fetch(`${ROOT}/chats/${chatId}/messages`, {
@@ -53,7 +73,48 @@
       if (e.name === "AbortError") return stopped();
       throw new Error(OFFLINE);
     }
-    if (!res.ok) throw new Error(await errorText(res));
+    if (!res.ok) throw await httpError(res);
+
+    const handle = (event, payload) => {
+      switch (event) {
+        case "user":
+          cb.onUser && cb.onUser(payload);
+          break;
+        case "answered":
+          cb.onAnswered && cb.onAnswered(payload);
+          break;
+        case "token":
+          addText(payload.delta);
+          cb.onToken && cb.onToken(payload.delta);
+          break;
+        case "tool_start":
+          parts.push({ type: "tool", id: payload.id, name: payload.name, args: null, result: null });
+          cb.onToolStart && cb.onToolStart(payload);
+          break;
+        case "tool_run": {
+          const p = parts.find((x) => x.type === "tool" && x.id === payload.id);
+          if (p) p.args = payload.args;
+          else parts.push({ type: "tool", id: payload.id, name: payload.name, args: payload.args, result: null });
+          cb.onToolRun && cb.onToolRun(payload);
+          break;
+        }
+        case "tool_end": {
+          const i = parts.findIndex((x) => x.type === "tool" && x.id === payload.part.id);
+          if (i > -1) parts[i] = payload.part;
+          else parts.push(payload.part);
+          cb.onToolEnd && cb.onToolEnd(payload.part);
+          break;
+        }
+        case "artifact":
+          cb.onArtifact && cb.onArtifact(payload.artifact);
+          break;
+        case "done":
+          return payload;
+        case "error":
+          throw new Error(payload.message);
+      }
+      return null;
+    };
 
     const reader = res.body.getReader(),
       dec = new TextDecoder();
@@ -75,13 +136,7 @@
             else if (line.startsWith("data:")) data += line.slice(5).trim();
           }
           if (!data) continue;
-          const payload = JSON.parse(data);
-          if (event === "user") onUser && onUser(payload);
-          else if (event === "token") {
-            text += payload.delta;
-            onToken && onToken(payload.delta);
-          } else if (event === "done") result = payload;
-          else if (event === "error") throw new Error(payload.message);
+          result = handle(event, JSON.parse(data)) || result;
         }
       }
     } catch (e) {
@@ -111,6 +166,13 @@
       remove: (id) => req("DELETE", `/chats/${id}`),
       restore: (id) => req("POST", `/chats/${id}/restore`),
       send,
+    },
+    artifacts: {
+      remove: (id) => req("DELETE", `/artifacts/${id}`),
+    },
+    settings: {
+      get: () => req("GET", "/settings"),
+      update: (patch) => req("PATCH", "/settings", patch),
     },
   };
 })();

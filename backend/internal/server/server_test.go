@@ -233,7 +233,11 @@ func TestChatFlow(t *testing.T) {
 	}
 	// The system prompt goes in `instructions`, and nothing is stored upstream.
 	last, _ := e.fake.Last()
-	if last["instructions"] != "Be brief." || last["store"] != false || last["stream"] != true || last["model"] != "fake-small" {
+	// With tools on (the default), guidance on using them follows the prompt.
+	if instr, _ := last["instructions"].(string); !strings.HasPrefix(instr, "Be brief.\n\nYou can call tools.") {
+		t.Fatalf("instructions: %q", instr)
+	}
+	if last["store"] != false || last["stream"] != true || last["model"] != "fake-small" {
 		t.Fatalf("request to provider: %v", last)
 	}
 

@@ -15,6 +15,7 @@ klean/
 │   │   ├── store/            SQLite schema, queries, and where the database lives
 │   │   ├── llm/              openai-go SDK: GET {base}/models, streaming POST {base}/responses
 │   │   ├── prompt/           decides which messages fit the context window
+│   │   ├── tools/            the tools the model can call; web search and page fetching
 │   │   ├── launch/           opens the browser, and a terminal window when double-clicked
 │   │   └── fakeprovider/     a fake OpenAI-compatible server for tests
 │   └── cmd/fakeprovider/     the same fake server as a program, for UI work
@@ -69,7 +70,8 @@ is pure Go, so there's no cgo.
 
 Replies use the OpenAI **Responses API** (`POST {base}/responses`, streamed) through the official
 [openai-go](https://github.com/openai/openai-go) SDK. The chat's system prompt is sent as `instructions`,
-the history as input messages, and `store: false` so the provider keeps no copy. A provider that only
+the history as input items (messages, and earlier tool calls with their outputs), and `store: false`
+so the provider keeps no copy. A provider that only
 has Chat Completions will answer 404, and the error says so. If that happens, update the server
 or check its docs for `/v1/responses` support.
 
@@ -136,11 +138,42 @@ start the backend with `--frontend none` and set the backend address before `js/
 
 To work on the UI with no backend at all, load `js/api.mock.js` instead of `js/api.js`.
 
+## Tools
+
+The model can call tools while it answers. They are sent as Responses API function tools, in three
+groups that the composer switches on and off:
+
+| Group | Tool | What it does |
+|---|---|---|
+| `artifacts` | `create_artifact` | Puts a standalone page, SVG, document or source file (`kind`: `html`, `svg`, `markdown`, `code`) in the side panel |
+| | `update_artifact` | Replaces an artifact's content; the version goes up by one |
+| `ask` | `ask_user` | Asks you a question with up to four options and ends the turn until you answer |
+| `web` | `web_search` | Top six results (title, URL, snippet) |
+| | `fetch_page` | Downloads a page and returns its readable text (first 12,000 characters) |
+
+When the model calls tools, Klean runs them, sends the results back and asks again, up to
+8 requests per reply. Tool calls and their outputs are saved with the message and replayed in later
+requests, so the model remembers what it searched for and what its artifacts contain.
+
+**Web search** uses DuckDuckGo's HTML results by default, which needs no key but sometimes turns
+automated requests away. For dependable search, pick Brave Search or Tavily in settings and save an
+API key for it; the key stays in the database and is never sent to the browser.
+
+**Page fetching runs on your computer**, with URLs chosen by the model, so it only fetches
+`http(s)` URLs on the public internet: loopback, private-network and link-local addresses are refused,
+also when a public name or a redirect leads to one. It does not go through a proxy.
+
+**Models without tool support:** if the provider rejects the request because of the tools, the error
+says so. Turn the tools off in the composer and send again; with all groups off, no tools are sent
+and earlier tool calls are left out of the history.
+
 ## How context is handled
 
 Every request sends the chat's system prompt plus as many recent messages as fit in
 75% of the chat's context window (the rest is left for the reply). Tokens are estimated at
 about four characters each. Older messages stay in the database and in the UI; they're just not sent.
+Tool calls count too (arguments and outputs), as do the tool definitions; a call is never sent
+without its output.
 Set the window per chat from the ring in the top bar.
 
 ## API
@@ -151,13 +184,45 @@ Set the window per chat from the ring in the top bar.
 | PATCH/DELETE | `/api/providers/{id}` | edit / remove (`apiKey: ""` clears the key) |
 | GET | `/api/providers/{id}/models` | models from the provider |
 | GET/POST | `/api/chats` | list / create |
-| GET/PATCH/DELETE | `/api/chats/{id}` | read with messages / update settings or title / delete |
+| GET/PATCH/DELETE | `/api/chats/{id}` | read with `messages` and `artifacts` / update settings or title / delete |
 | POST | `/api/chats/{id}/restore` | undo a delete (kept for 24 hours) |
-| POST | `/api/chats/{id}/messages` | send; streams Server-Sent Events: `user`, `token`, `done` or `error` |
+| POST | `/api/chats/{id}/messages` | send; streams Server-Sent Events (below) |
+| DELETE | `/api/artifacts/{id}` | remove an artifact |
+| GET/PATCH | `/api/settings` | `{searchProvider, hasSearchKey}`; PATCH takes `searchProvider` (`duckduckgo`, `brave`, `tavily`) and `searchKey` (`""` clears it; never returned) |
 
-`/messages` body: `{content, providerId, model}`, plus `editMessageId` to replace a message
-and everything after it, or `regenerate: true` to replace the last reply.
-Closing the connection stops generation; the partial reply is saved and marked as stopped.
+`/messages` body: `{content, providerId, model}`, plus any of:
+
+- `editMessageId` to replace a message and everything after it, or `regenerate: true` to replace
+  the last reply. Both also delete the artifacts the removed replies created.
+- `tools`: the enabled tool groups, a subset of `["artifacts", "ask", "web"]`. Left out, all are
+  enabled; `[]` sends no tools.
+- `answer: {callId, text}` to answer a pending `ask_user` question. No user message is created and
+  the model continues in a new assistant message. Sending an ordinary message instead closes the
+  question as skipped.
+
+Events, in the order they can occur:
+
+| Event | Data | |
+|---|---|---|
+| `user` | the saved user message | first, unless regenerating or answering |
+| `answered` | `{messageId, part}` | first when the request had `answer`: the question's part, now done |
+| `token` | `{delta}` | text; may come before, between and after tool calls |
+| `tool_start` | `{id, name}` | the model began a tool call |
+| `tool_run` | `{id, name, args}` | arguments complete, the tool is running |
+| `artifact` | `{artifact}` | the full artifact after a create or update, before its `tool_end` |
+| `tool_end` | `{part}` | the finished tool part |
+| `done` | `{message, title}` | the saved reply. If its last part is a pending `ask_user`, it is waiting for you |
+| `error` | `{message}` | instead of `done` |
+
+Assistant messages carry `parts`, the reply in the order it was produced:
+`{type: "text", text}` and
+`{type: "tool", id, name, args, status: "pending"|"done"|"error", result, error?}`;
+`content` is the text parts joined. `result` is `{artifactId, title, kind, language, version}` for the
+artifact tools, `{answer}` for `ask_user`, `{query, results: [{title, url, snippet}]}` for
+`web_search` and `{url, title, chars}` for `fetch_page`; it is `null` while pending and on error.
+
+Closing the connection stops generation; the partial reply, including the tool calls that
+finished, is saved and marked as stopped.
 
 ## Tests
 
@@ -167,3 +232,19 @@ go test ./...
 
 The tests run against a small fake provider that speaks the streaming Responses API. You can also
 point the UI at it (`go run ./backend/cmd/fakeprovider 9100` → base URL `http://127.0.0.1:9100/v1`).
+
+It answers every message with the same canned reply, except for these words in the message:
+
+| Word | Effect |
+|---|---|
+| `/artifact`, `/code`, `/svg` | creates an HTML page, a Python file (`kind: code`), an SVG image |
+| `/update` | updates the most recent artifact in the chat |
+| `/ask` | asks a question with three options |
+| `/search words…` | searches the web for the words after it |
+| `/fetch URL` | fetches that URL (`https://example.com/` if none is given) |
+| `/loop` | calls a tool on every request, to show the round limit |
+| `NOTOOLS` | rejects the request with a 400 if it carries tools |
+| `SLOW`, `FAIL`, `MIDFAIL` | streams slowly, answers 500, fails partway through |
+
+The tool words only act when the matching tool group is enabled; after the tool's output comes
+back, the fake replies with a line of text quoting it.

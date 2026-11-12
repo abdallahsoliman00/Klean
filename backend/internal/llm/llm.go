@@ -29,11 +29,16 @@ const (
 )
 
 // UpstreamError carries a message meant for the person using the UI.
-type UpstreamError struct{ Msg string }
+type UpstreamError struct {
+	Msg string
+	// rejected is set when the provider refused the request itself (a 4xx or
+	// 501), as opposed to failing while answering it.
+	rejected bool
+}
 
 func (e *UpstreamError) Error() string { return e.Msg }
 
-func upstream(format string, a ...any) error { return &UpstreamError{fmt.Sprintf(format, a...)} }
+func upstream(format string, a ...any) error { return &UpstreamError{Msg: fmt.Sprintf(format, a...)} }
 
 type Model struct {
 	ID      string `json:"id"`
@@ -125,6 +130,20 @@ func firstNonEmpty(s ...string) string {
 	return ""
 }
 
+// Tool is a function the model may call.
+type Tool struct {
+	Name        string
+	Description string
+	Parameters  map[string]any // JSON schema of the arguments object
+}
+
+// ToolCall is a function call the model finished writing.
+type ToolCall struct {
+	ID        string // sent back with the output so the model can match them up
+	Name      string
+	Arguments string // JSON object, as the model wrote it
+}
+
 // Request is one reply to generate.
 type Request struct {
 	BaseURL      string
@@ -133,33 +152,194 @@ type Request struct {
 	Instructions string // the chat's system prompt
 	Turns        []prompt.Turn
 	Temperature  float64
+	Tools        []Tool // none: the request carries no tools at all
 }
 
-// StreamReply streams a reply through the Responses API, calling onDelta with
-// each piece of text as it arrives. Cancelling ctx stops generation and closes
-// the request to the provider. Errors meant for the user are *UpstreamError;
-// a cancelled ctx returns ctx.Err().
-func StreamReply(ctx context.Context, r Request, onDelta func(string)) error {
-	url := endpoint(r.BaseURL, "/responses")
-	client := newClient(r.BaseURL, r.APIKey)
+// Handler receives the reply as it streams. Either function may be nil.
+type Handler struct {
+	OnDelta     func(text string)
+	OnCallStart func(id, name string) // a tool call began; its arguments are still streaming
+}
 
-	input := make(responses.ResponseInputParam, 0, len(r.Turns))
-	for _, t := range r.Turns {
+// buildInput turns the history into Responses input items. Nothing is stored
+// on the provider, so earlier tool calls are replayed in full: each as a
+// function_call item followed by its function_call_output.
+func buildInput(turns []prompt.Turn) responses.ResponseInputParam {
+	input := make(responses.ResponseInputParam, 0, len(turns))
+	for _, t := range turns {
+		if c := t.Call; c != nil {
+			out := responses.ResponseInputItemParamOfFunctionCallOutput(c.Output)
+			out.OfFunctionCallOutput.CallID = openai.String(c.ID)
+			input = append(input, responses.ResponseInputItemParamOfFunctionCall(c.Arguments, c.ID, c.Name), out)
+			continue
+		}
 		role := responses.EasyInputMessageRoleUser
 		if t.Role == "assistant" {
 			role = responses.EasyInputMessageRoleAssistant
 		}
 		input = append(input, responses.ResponseInputItemParamOfMessage(t.Content, role))
 	}
+	return input
+}
+
+func buildTools(tools []Tool) []responses.ToolUnionParam {
+	out := make([]responses.ToolUnionParam, 0, len(tools))
+	for _, t := range tools {
+		// Not strict: strict mode forbids optional arguments, and several
+		// OpenAI-compatible servers don't implement it.
+		p := responses.ToolParamOfFunction(t.Name, t.Parameters, false)
+		p.OfFunction.Description = openai.String(t.Description)
+		out = append(out, p)
+	}
+	return out
+}
+
+// rawItem is an output item as it appears in stream events and in the final
+// response. It is decoded by hand to accept what looser servers send.
+type rawItem struct {
+	Type      string          `json:"type"`
+	ID        string          `json:"id"`
+	CallID    string          `json:"call_id"`
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
+}
+
+// arguments returns the JSON text; a few servers send an object instead of a string.
+func (it rawItem) arguments() string {
+	var s string
+	if json.Unmarshal(it.Arguments, &s) == nil {
+		return s
+	}
+	if string(it.Arguments) == "null" {
+		return ""
+	}
+	return string(it.Arguments)
+}
+
+type rawEvent struct {
+	ItemID      string  `json:"item_id"`
+	OutputIndex *int64  `json:"output_index"`
+	Name        string  `json:"name"`
+	Arguments   string  `json:"arguments"`
+	Item        rawItem `json:"item"`
+	Response    struct {
+		Output []rawItem `json:"output"`
+	} `json:"response"`
+}
+
+// callTracker pieces tool calls together from the stream. Servers differ in
+// which events they send (output_item.added, function_call_arguments.done,
+// output_item.done, or only the final response), so a call is taken from
+// whichever source has it and matched up so it is never returned twice.
+type callTracker struct {
+	calls   []*trackedCall
+	onStart func(id, name string)
+}
+
+type trackedCall struct {
+	itemID, callID, name, args string
+	index                      int64  // output_index, or -1
+	announced                  string // the id given to onStart
+	complete                   bool
+}
+
+// find returns the call an event refers to, adding it when it is new.
+func (t *callTracker) find(itemID, callID string, index *int64) *trackedCall {
+	for _, c := range t.calls {
+		switch {
+		case itemID != "" && c.itemID != "":
+			if itemID == c.itemID {
+				return c
+			}
+		case callID != "" && c.callID != "":
+			if callID == c.callID {
+				return c
+			}
+		case index != nil && c.index == *index:
+			return c
+		}
+	}
+	c := &trackedCall{itemID: itemID, callID: callID, index: -1}
+	if index != nil {
+		c.index = *index
+	}
+	t.calls = append(t.calls, c)
+	return c
+}
+
+func (t *callTracker) item(it rawItem, index *int64, done bool) {
+	if it.Type != "function_call" {
+		return
+	}
+	c := t.find(it.ID, it.CallID, index)
+	if c.callID == "" {
+		c.callID = it.CallID
+	}
+	if c.name == "" {
+		c.name = it.Name
+	}
+	if a := it.arguments(); a != "" && (done || c.args == "") {
+		c.args = a
+	}
+	c.complete = c.complete || done
+	t.announce(c)
+}
+
+// announce reports the call once, as soon as its name is known.
+func (t *callTracker) announce(c *trackedCall) {
+	if c.announced != "" || c.name == "" {
+		return
+	}
+	c.announced = firstNonEmpty(c.callID, c.itemID, fmt.Sprintf("call_%d", len(t.calls)))
+	if t.onStart != nil {
+		t.onStart(c.announced, c.name)
+	}
+}
+
+func (t *callTracker) argumentsDone(ev rawEvent) {
+	c := t.find(ev.ItemID, "", ev.OutputIndex)
+	if c.name == "" {
+		c.name = ev.Name
+	}
+	c.args, c.complete = ev.Arguments, true
+	t.announce(c)
+}
+
+// finished returns the completed calls in the order the model made them.
+// The id is the one announced at the start, so the caller sees one id per call.
+func (t *callTracker) finished() []ToolCall {
+	var out []ToolCall
+	for _, c := range t.calls {
+		if !c.complete || c.name == "" {
+			continue
+		}
+		t.announce(c)
+		out = append(out, ToolCall{ID: c.announced, Name: c.name, Arguments: c.args})
+	}
+	return out
+}
+
+// StreamReply streams one response through the Responses API, passing text
+// and the start of tool calls to h as they arrive, and returns the tool calls
+// the model made (none when the reply is finished). Cancelling ctx stops
+// generation and closes the request to the provider. Errors meant for the
+// user are *UpstreamError; a cancelled ctx returns ctx.Err().
+func StreamReply(ctx context.Context, r Request, h Handler) ([]ToolCall, error) {
+	url := endpoint(r.BaseURL, "/responses")
+	client := newClient(r.BaseURL, r.APIKey)
+
 	params := responses.ResponseNewParams{
 		Model:       r.Model,
-		Input:       responses.ResponseNewParamsInputUnion{OfInputItemList: input},
+		Input:       responses.ResponseNewParamsInputUnion{OfInputItemList: buildInput(r.Turns)},
 		Temperature: openai.Float(r.Temperature),
 		// The history lives in our database; don't keep a copy on the provider.
 		Store: openai.Bool(false),
 	}
 	if r.Instructions != "" {
 		params.Instructions = openai.String(r.Instructions)
+	}
+	if len(r.Tools) > 0 {
+		params.Tools = buildTools(r.Tools)
 	}
 
 	// Give up if the provider goes quiet, but not merely because a reply is long.
@@ -172,6 +352,7 @@ func StreamReply(ctx context.Context, r Request, onDelta func(string)) error {
 	stream := client.Responses.NewStreaming(ctx, params)
 	defer stream.Close()
 
+	tracker := &callTracker{onStart: h.OnCallStart}
 	got := false
 	for stream.Next() {
 		idle.Reset(idleTimeout)
@@ -180,33 +361,74 @@ func StreamReply(ctx context.Context, r Request, onDelta func(string)) error {
 		case "response.output_text.delta", "response.refusal.delta":
 			if ev.Delta != "" {
 				got = true
-				onDelta(ev.Delta)
+				if h.OnDelta != nil {
+					h.OnDelta(ev.Delta)
+				}
+			}
+		case "response.output_item.added", "response.output_item.done":
+			var raw rawEvent
+			if json.Unmarshal([]byte(ev.RawJSON()), &raw) == nil {
+				tracker.item(raw.Item, raw.OutputIndex, ev.Type == "response.output_item.done")
+			}
+		case "response.function_call_arguments.done":
+			var raw rawEvent
+			if json.Unmarshal([]byte(ev.RawJSON()), &raw) == nil {
+				tracker.argumentsDone(raw)
 			}
 		case "response.completed", "response.incomplete":
-			return nil
+			var raw rawEvent
+			if json.Unmarshal([]byte(ev.RawJSON()), &raw) == nil {
+				for i, it := range raw.Response.Output {
+					index := int64(i)
+					tracker.item(it, &index, true)
+				}
+			}
+			return tracker.finished(), nil
 		case "response.failed":
 			if msg := ev.Response.Error.Message; msg != "" {
-				return upstream("The provider failed to answer: %s", msg)
+				return nil, upstream("The provider failed to answer: %s", msg)
 			}
-			return upstream("The provider failed to answer.")
+			return nil, upstream("The provider failed to answer.")
 		case "error":
 			if ev.Message != "" {
-				return upstream("The provider reported an error: %s", ev.Message)
+				return nil, upstream("The provider reported an error: %s", ev.Message)
 			}
-			return upstream("The provider reported an error.")
+			return nil, upstream("The provider reported an error.")
 		}
 	}
 	err := stream.Err()
 	if context.Cause(ctx) == errIdle {
-		return upstream("The provider stopped responding (timed out).")
+		return nil, upstream("The provider stopped responding (timed out).")
 	}
 	if err == nil {
-		if !got {
-			return upstream("%s ended without a reply. Check that this provider supports the Responses API.", url)
+		calls := tracker.finished()
+		if !got && len(calls) == 0 {
+			return nil, upstream("%s ended without a reply. Check that this provider supports the Responses API.", url)
 		}
-		return nil // stream closed without a final event; keep what arrived
+		return calls, nil // stream closed without a final event; keep what arrived
 	}
-	return explain(err, url, true)
+	err = explain(err, url, true)
+	if len(r.Tools) > 0 {
+		err = explainTools(err)
+	}
+	return nil, err
+}
+
+// explainTools rewrites a provider's rejection of the tools in a request into
+// advice. Providers word it differently ("tools is not supported", "does not
+// support function calling", "unknown field tools"), so any 4xx or 501 that
+// mentions tools or functions counts.
+func explainTools(err error) error {
+	var ue *UpstreamError
+	if !errors.As(err, &ue) || !ue.rejected {
+		return err
+	}
+	low := strings.ToLower(ue.Msg)
+	if !strings.Contains(low, "tool") && !strings.Contains(low, "function") {
+		return err
+	}
+	return upstream("This model or provider doesn't appear to support tools. Turn tools off in the composer "+
+		"and send the message again. (%s)", strings.TrimSuffix(ue.Msg, "."))
 }
 
 // explain turns an SDK or network error into a message for the user.
@@ -238,10 +460,13 @@ func explain(err error, url string, isResponses bool) error {
 			body, _ := io.ReadAll(io.LimitReader(apiErr.Response.Body, 4096))
 			detail = errorDetail(body)
 		}
+		msg := fmt.Sprintf("The provider returned %d.", apiErr.StatusCode)
 		if detail != "" {
-			return upstream("The provider returned %d: %s", apiErr.StatusCode, detail)
+			msg = fmt.Sprintf("The provider returned %d: %s", apiErr.StatusCode, detail)
 		}
-		return upstream("The provider returned %d.", apiErr.StatusCode)
+		refused := apiErr.StatusCode == http.StatusNotImplemented ||
+			(apiErr.StatusCode >= 400 && apiErr.StatusCode < 500 && apiErr.StatusCode != http.StatusTooManyRequests)
+		return &UpstreamError{Msg: msg, rejected: refused}
 	}
 	var syntaxErr *json.SyntaxError
 	if errors.As(err, &syntaxErr) {

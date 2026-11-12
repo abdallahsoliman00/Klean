@@ -1,5 +1,5 @@
 // A fake OpenAI-compatible provider for UI work without a real model.
-// Run: go run ./cmd/fakeprovider 9100   -> base URL http://127.0.0.1:9100/v1
+// Run: go run ./backend/cmd/fakeprovider 9100   -> base URL http://127.0.0.1:9100/v1
 package main
 
 import (

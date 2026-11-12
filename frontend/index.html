@@ -4,43 +4,122 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Klean</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect width='22' height='22' rx='7' fill='%231A1F27'/%3E%3Crect x='5' y='7' width='8' height='2' rx='1' fill='%23fff'/%3E%3Crect x='9' y='13' width='8' height='2' rx='1' fill='%23fff'/%3E%3C/svg%3E">
+<meta name="theme-color" id="themeColor" content="#E9ECF0">
+<script>
+/* mode and colour scheme, applied before first paint */
+(function(){var d=document.documentElement,t='system',s='klean';try{t=localStorage.getItem('sb:theme')||t;s=localStorage.getItem('sb:scheme')||s}catch(e){}
+d.dataset.scheme=s;d.dataset.theme=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'})();
+</script>
+<link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect width='22' height='22' rx='7' fill='%231A1F27'/%3E%3Crect x='5' y='7' width='8' height='2' rx='1' fill='%23fff'/%3E%3Crect x='9' y='13' width='8' height='2' rx='1' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
 <script src="vendor/highlight.min.js"></script>
 <script src="js/api.js"></script>
 <style>
+/* ---------- colour schemes ----------
+   Every scheme defines the full token set twice: light, then dark. The attributes can sit on any
+   element (the swatches in Settings use that), so the first pair also answers to [data-scheme="klean"]. */
 :root{
-  --bg:#E9ECF0; --surface:#F7F8FA; --raised:#FFFFFF; --ink:#1A1F27; --muted:#5D6673; --faint:#8A929E;
+  --ui:"Instrument Sans",system-ui,sans-serif; --prose:"Newsreader",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1); --sidebar:280px; --art:clamp(380px,40vw,680px);
+}
+:root,[data-scheme="klean"]{
+  --bg:#E9ECF0; --surface:#F7F8FA; --raised:#FFFFFF; --ink:#1A1F27; --muted:#5D6673; --faint:#7F8894;
   --line:#D9DEE5; --line-soft:#E5E9EE; --accent:#2B59C3; --accent-hover:#244CA8; --accent-soft:#E2E9F8;
   --accent-ink:#FFFFFF; --user:#E1E7F3; --danger:#B4372F; --danger-soft:#F7E3E1; --ok:#2F7D4F; --caret:#D9822B;
   --code-bg:#EEF1F5; --shadow:0 12px 40px -12px rgba(26,31,39,.28), 0 2px 6px rgba(26,31,39,.06);
-  --t-key:#7A3EB8; --t-str:#2F7D4F; --t-num:#B05A12; --t-com:#8A929E; --t-fn:#2B59C3;
-  --ui:"Instrument Sans",system-ui,sans-serif; --prose:"Newsreader",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,monospace;
-  --ease:cubic-bezier(.2,.8,.2,1); --sidebar:280px;
+  --t-key:#7A3EB8; --t-str:#2B7549; --t-num:#A55410; --t-com:#7F8894; --t-fn:#2B59C3;
   color-scheme:light;
 }
 [data-theme="dark"]{
-  --bg:#12151B; --surface:#181C23; --raised:#1F242D; --ink:#E6E9EE; --muted:#9AA3AF; --faint:#6B7480;
-  --line:#2A313C; --line-soft:#232932; --accent:#7C9CFF; --accent-hover:#97B0FF; --accent-soft:#232D47;
-  --accent-ink:#0F1420; --user:#232B3B; --danger:#F08A80; --danger-soft:#3A2223; --ok:#6CC594; --caret:#F0A75A;
-  --code-bg:#14181E; --shadow:0 16px 48px -12px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.3);
-  --t-key:#C79BFF; --t-str:#8FD4A8; --t-num:#F2B272; --t-com:#6B7480; --t-fn:#8FB0FF;
+  --bg:#07090B; --surface:#0F1216; --raised:#171B21; --ink:#E4E7EC; --muted:#979FAA; --faint:#6F7782;
+  --line:#262C35; --line-soft:#1A1F26; --accent:#6CA6F5; --accent-hover:#8DBBF8; --accent-soft:#15253B;
+  --accent-ink:#07111F; --user:#1B222C; --danger:#F08A80; --danger-soft:#33191A; --ok:#6CC594; --caret:#F0A75A;
+  --code-bg:#0A0C10; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#EE9488; --t-str:#8FD4A8; --t-num:#E9BD6B; --t-com:#6F7782; --t-fn:#8DB8F7;
+  color-scheme:dark;
+}
+[data-scheme="graphite"]{
+  --bg:#E6E6E6; --surface:#F4F4F4; --raised:#FFFFFF; --ink:#171717; --muted:#5A5A5A; --faint:#808080;
+  --line:#D4D4D4; --line-soft:#E4E4E4; --accent:#262626; --accent-hover:#000000; --accent-soft:#E2E2E2;
+  --accent-ink:#FFFFFF; --user:#E4E4E4; --danger:#A8332B; --danger-soft:#F5E2E0; --ok:#2F7D4F; --caret:#D9822B;
+  --code-bg:#ECECEC; --shadow:0 12px 40px -12px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.06);
+  --t-key:#171717; --t-str:#3F6149; --t-num:#84531C; --t-com:#808080; --t-fn:#34497A;
+  color-scheme:light;
+}
+[data-scheme="graphite"][data-theme="dark"]{
+  --bg:#070707; --surface:#101010; --raised:#191919; --ink:#EAEAEA; --muted:#A0A0A0; --faint:#737373;
+  --line:#2B2B2B; --line-soft:#1D1D1D; --accent:#EDEDED; --accent-hover:#FFFFFF; --accent-soft:#2A2A2A;
+  --accent-ink:#111111; --user:#222222; --danger:#F08A80; --danger-soft:#351C1C; --ok:#6CC594; --caret:#F0A75A;
+  --code-bg:#0A0A0A; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#F2F2F2; --t-str:#A5C4AE; --t-num:#D8B48A; --t-com:#737373; --t-fn:#A9BCDF;
+  color-scheme:dark;
+}
+[data-scheme="paper"]{
+  --bg:#E9E2D3; --surface:#F5F0E4; --raised:#FCF9F1; --ink:#2A2418; --muted:#665B48; --faint:#8A7D63;
+  --line:#DCD2BD; --line-soft:#E7DFCE; --accent:#8A4F00; --accent-hover:#6F3F00; --accent-soft:#F1E2BF;
+  --accent-ink:#FFFAF0; --user:#EBDFC4; --danger:#A93A26; --danger-soft:#F4DDD3; --ok:#4B7030; --caret:#C8811A;
+  --code-bg:#EFE8D8; --shadow:0 12px 40px -12px rgba(42,36,24,.3), 0 2px 6px rgba(42,36,24,.07);
+  --t-key:#9A3F2E; --t-str:#4F6927; --t-num:#1F6B74; --t-com:#8A7D63; --t-fn:#8A4F00;
+  color-scheme:light;
+}
+[data-scheme="paper"][data-theme="dark"]{
+  --bg:#0B0906; --surface:#15110B; --raised:#1E1911; --ink:#EDE4D0; --muted:#A99D85; --faint:#7C715C;
+  --line:#30291C; --line-soft:#231D13; --accent:#E5A84B; --accent-hover:#F0BC6C; --accent-soft:#33260F;
+  --accent-ink:#1A1203; --user:#29221A; --danger:#F0907F; --danger-soft:#381C16; --ok:#A3C37A; --caret:#F0A75A;
+  --code-bg:#100D08; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#EE9C84; --t-str:#B4CB85; --t-num:#7FC7C9; --t-com:#7C715C; --t-fn:#E9B866;
+  color-scheme:dark;
+}
+[data-scheme="moss"]{
+  --bg:#E3E8E1; --surface:#F3F6F1; --raised:#FCFDFB; --ink:#18211B; --muted:#56635A; --faint:#768378;
+  --line:#D3DCD2; --line-soft:#E2E8E0; --accent:#2A6B48; --accent-hover:#205739; --accent-soft:#DCEBDF;
+  --accent-ink:#FFFFFF; --user:#DDE8DC; --danger:#B4372F; --danger-soft:#F6E2DF; --ok:#2A6B48; --caret:#C77B1E;
+  --code-bg:#EAEFE8; --shadow:0 12px 40px -12px rgba(24,33,27,.28), 0 2px 6px rgba(24,33,27,.06);
+  --t-key:#86451B; --t-str:#2A6B48; --t-num:#8A5A12; --t-com:#768378; --t-fn:#1F6770;
+  color-scheme:light;
+}
+[data-scheme="moss"][data-theme="dark"]{
+  --bg:#060907; --surface:#0D120F; --raised:#151C18; --ink:#E2E9E3; --muted:#94A298; --faint:#6A786E;
+  --line:#243029; --line-soft:#18201B; --accent:#7CCB9B; --accent-hover:#9BDAB3; --accent-soft:#16301F;
+  --accent-ink:#06140C; --user:#1A251E; --danger:#F08A80; --danger-soft:#351B1B; --ok:#7CCB9B; --caret:#F0B25A;
+  --code-bg:#080C0A; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#E8A27C; --t-str:#93D6A9; --t-num:#E6C274; --t-com:#6A786E; --t-fn:#7FCFD0;
+  color-scheme:dark;
+}
+[data-scheme="contrast"]{
+  --bg:#EFEFEF; --surface:#FFFFFF; --raised:#FFFFFF; --ink:#000000; --muted:#2E2E2E; --faint:#555555;
+  --line:#4A4A4A; --line-soft:#D6D6D6; --accent:#0033B8; --accent-hover:#00227A; --accent-soft:#D6E2FF;
+  --accent-ink:#FFFFFF; --user:#E3E3E3; --danger:#A30000; --danger-soft:#FFE0DC; --ok:#005C2B; --caret:#B34700;
+  --code-bg:#F5F5F5; --shadow:0 12px 40px -12px rgba(0,0,0,.4), 0 0 0 1px #000;
+  --t-key:#8A1500; --t-str:#005C2B; --t-num:#7A4100; --t-com:#555555; --t-fn:#0033B8;
+  color-scheme:light;
+}
+[data-scheme="contrast"][data-theme="dark"]{
+  --bg:#000000; --surface:#000000; --raised:#121212; --ink:#FFFFFF; --muted:#D6D6D6; --faint:#A6A6A6;
+  --line:#8C8C8C; --line-soft:#3A3A3A; --accent:#FFD400; --accent-hover:#FFE45C; --accent-soft:#3D3300;
+  --accent-ink:#000000; --user:#262626; --danger:#FF9C91; --danger-soft:#4A1512; --ok:#6FE39D; --caret:#FFD400;
+  --code-bg:#0A0A0A; --shadow:0 16px 48px -12px rgba(0,0,0,.8), 0 0 0 1px #fff;
+  --t-key:#FF9E8A; --t-str:#8FE8A8; --t-num:#FFCF70; --t-com:#A6A6A6; --t-fn:#8CC8FF;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
+html{scrollbar-color:var(--line) transparent}
 body{font-family:var(--ui);font-size:14px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;overflow:auto}
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;padding:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 svg{display:block}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+[hidden]{display:none!important}
 
 /* ---------- shell ---------- */
-.app{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:100%;height:100vh;height:100dvh;min-height:640px;overflow:hidden;transition:grid-template-columns .32s var(--ease)}
-.app.collapsed{grid-template-columns:0 1fr}
+.app{display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr) 0px;grid-template-rows:100%;height:100vh;height:100dvh;min-height:640px;overflow:hidden;transition:grid-template-columns .32s var(--ease)}
+.app.collapsed{grid-template-columns:0 minmax(0,1fr) 0px}
+.app.art-open{grid-template-columns:var(--sidebar) minmax(0,1fr) var(--art)}
+.app.art-open.collapsed{grid-template-columns:0 minmax(0,1fr) var(--art)}
 
 /* ---------- sidebar ---------- */
 .sidebar{overflow:hidden;display:flex;flex-direction:column;min-width:0}
@@ -84,14 +163,14 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
 .main{grid-column:2;background:var(--surface);display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;position:relative;border-left:1px solid var(--line)}
 .app.collapsed .main{border-left-color:transparent}
 .topbar{display:flex;align-items:center;gap:6px;padding:10px 14px;height:56px;flex-shrink:0}
-.model-pill{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 12px;border-radius:10px;font-weight:500;transition:background .12s;max-width:52vw}
+.model-pill{display:flex;align-items:center;gap:8px;min-width:0;padding:7px 10px 7px 12px;border-radius:10px;font-weight:500;transition:background .12s;max-width:52vw}
 .model-pill:hover{background:var(--line-soft)}
-.model-pill .prov{color:var(--faint);font-weight:400}
+.model-pill .prov{color:var(--faint);font-weight:400;white-space:nowrap}
 .model-pill .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .model-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex-shrink:0}
 .model-pill .dot.off{background:var(--danger)}
 .topbar .spacer{flex:1}
-.ctx{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.ctx{display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0;padding:6px 10px;border-radius:9px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
 .ctx:hover{background:var(--line-soft)}
 .ctx svg circle{transition:stroke-dashoffset .5s var(--ease)}
 
@@ -151,6 +230,135 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
 .tool:hover{background:var(--line-soft);color:var(--ink)}
 .tool.done{color:var(--ok)}
 
+/* ---------- message parts: prose and tool calls in the order they happened ---------- */
+.parts>*+*{margin-top:12px}
+.parts>.trow+.trow,.parts>.trow+.tsearch,.parts>.tsearch+.trow,.parts>.tsearch+.tsearch{margin-top:2px}
+.parts>.thinking{margin-top:4px}
+.trow{font-family:var(--ui);font-size:13px;line-height:1.45;color:var(--muted);display:flex;align-items:center;gap:8px;min-height:28px;max-width:100%}
+.trow>svg{flex-shrink:0;color:var(--faint)}
+.trow .t-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .t-aside{color:var(--faint);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:2}
+.trow a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.trow a:hover{text-decoration-color:currentColor}
+.trow q{quotes:"“" "”";color:var(--ink)}
+.trow.err>svg{color:var(--danger)}
+.trow.err{align-items:flex-start;padding:4px 0}
+.trow.err>svg{margin-top:2px}
+.trow.err .t-text{white-space:normal}
+.trow.err b{font-weight:500;color:var(--ink)}
+button.trow{margin-left:-8px;padding:0 8px;border-radius:8px;text-align:left}
+button.trow:hover{background:var(--line-soft);color:var(--ink)}
+button.trow .chev{transition:transform .2s var(--ease)}
+button.trow[aria-expanded="true"] .chev{transform:rotate(90deg)}
+.results{list-style:none;margin:4px 0 6px 6px;padding:2px 0 2px 14px;border-left:1px solid var(--line);font-family:var(--ui);display:grid;gap:2px}
+.res{display:block;padding:7px 10px;border-radius:9px;color:inherit;text-decoration:none;max-width:560px}
+a.res:hover{background:var(--line-soft)}
+.res-top{display:flex;align-items:baseline;gap:10px}
+.res-t{font-size:13.5px;font-weight:500;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res-d{font-size:12px;color:var(--faint);white-space:nowrap}
+.res-s{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:2px}
+
+/* artifact card */
+.acard{display:flex;align-items:center;gap:12px;width:100%;max-width:420px;padding:9px 14px 9px 9px;border-radius:14px;background:var(--raised);border:1px solid var(--line);text-align:left;font-family:var(--ui);transition:border-color .15s,transform .15s}
+.acard:hover:not(:disabled){border-color:var(--faint)}
+.acard:active:not(:disabled){transform:scale(.99)}
+.acard.current{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.acard:disabled{cursor:default}
+.acard.gone{background:transparent;border-style:dashed}
+.acard.gone .glyph{background:var(--line-soft);color:var(--faint)}
+.acard.gone .a-title{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.glyph{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex-shrink:0}
+.a-text{min-width:0;flex:1;display:grid;gap:1px}
+.a-title{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.a-meta{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--faint);white-space:nowrap;overflow:hidden}
+.ver{font-family:var(--mono);font-size:11px;padding:0 5px;border-radius:5px;border:1px solid var(--line);color:var(--muted);line-height:16px}
+.a-go{font-size:12.5px;color:var(--faint);flex-shrink:0}
+.acard:hover:not(:disabled) .a-go,.acard.current .a-go{color:var(--accent)}
+
+/* question card */
+.ask{max-width:540px;background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:16px 16px 14px;font-family:var(--ui)}
+.ask-q{font-family:var(--prose);font-size:18px;line-height:1.4;margin:0 0 3px}
+.ask-how{font-size:12.5px;color:var(--faint);margin:0 0 10px}
+.opts{display:grid;gap:2px;margin:0 -6px 8px}
+.opt{display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;padding:9px 10px;border-radius:10px;line-height:1.4;transition:background .12s}
+.opt:hover{background:var(--line-soft)}
+.opt[aria-checked="true"]{background:var(--accent-soft)}
+.opt .mark{width:17px;height:17px;margin-top:1px;border-radius:50%;border:1.5px solid var(--faint);flex-shrink:0;display:grid;place-items:center;color:transparent;transition:background .12s,border-color .12s}
+.opt[role="checkbox"] .mark{border-radius:5px}
+.opt[aria-checked="true"] .mark{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.opt b{font-weight:500;display:block}
+.opt span.d{display:block;font-size:12.5px;color:var(--muted)}
+.ask-foot{display:flex;gap:8px;align-items:center}
+.ask-foot .input{flex:1;min-width:0;height:36px;padding-top:0;padding-bottom:0}
+.asked{font-family:var(--ui);display:flex;flex-direction:column;gap:6px}
+.asked .bubble{align-self:flex-end}
+
+/* ---------- artifact panel ---------- */
+.art{grid-column:3;min-width:0;overflow:hidden;background:var(--bg);border-left:1px solid var(--line);visibility:hidden;transition:visibility 0s .32s}
+.app.art-open .art{visibility:visible;transition-delay:0s}
+.art-inner{width:var(--art);height:100%;display:flex;flex-direction:column}
+.art-head{display:flex;align-items:center;gap:6px;height:56px;padding:10px 10px 10px 12px;flex-shrink:0}
+.art-switch{display:flex;align-items:center;gap:10px;min-width:0;padding:5px 10px 5px 5px;border-radius:10px;font-weight:600;font-size:15px;letter-spacing:-.01em;transition:background .12s}
+.art-switch:hover,.art-switch[aria-expanded="true"]{background:var(--line-soft)}
+.art-switch .glyph{width:28px;height:28px;border-radius:7px}
+.art-switch .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.art-switch .count{font-weight:400;font-size:12.5px;color:var(--faint);white-space:nowrap}
+.art-switch>svg{flex-shrink:0;color:var(--faint)}
+.art-head .spacer,.art-bar .spacer{flex:1}
+.app.art-open .ctx .n-label{display:none}
+.app.art-open #artBtn{background:var(--line-soft);color:var(--ink)}
+.art-bar{display:flex;align-items:center;gap:4px;padding:0 10px 10px 12px;flex-shrink:0;min-height:44px}
+.art-bar .a-meta{margin-left:6px}
+.art-bar .seg+.a-meta{margin-left:12px}
+.seg.small button{padding:4px 12px;font-size:13px}
+.icon-btn.done{color:var(--ok)}
+.icon-btn.danger:hover{color:var(--danger)}
+.art-view{flex:1;min-height:0;margin:0 12px 12px;border-radius:14px;border:1px solid var(--line);background:var(--raised);overflow:hidden;display:flex;flex-direction:column}
+.art-view iframe{flex:1;width:100%;border:0;background:#fff;display:block}
+.art-scroll{flex:1;overflow:auto;scrollbar-width:thin}
+.art-scroll.code{background:var(--code-bg)}
+.art-doc{padding:28px 32px 40px;max-width:720px;margin:0 auto}
+.art-code{margin:0;padding:16px 18px 28px;font-family:var(--mono);font-size:12.5px;line-height:1.65;width:max-content;min-width:100%;box-sizing:border-box;tab-size:2}
+.art-code code{font:inherit}
+.art-empty{margin:auto;padding:28px;text-align:center;color:var(--faint);line-height:1.5}
+.pop{min-width:240px;max-width:min(340px,calc(100vw - 16px));max-height:min(420px,70vh);overflow-y:auto}
+.pop .pop-label{font-size:12px;color:var(--faint);font-weight:500;padding:6px 10px 4px}
+.pop button .glyph{width:28px;height:28px;border-radius:7px}
+.pop button .a-text{gap:0}
+.pop button .a-title{font-size:13.5px}
+.pop button .check{color:var(--accent);visibility:hidden;flex-shrink:0}
+.pop button[aria-selected="true"] .check{visibility:visible}
+.pop button.sw{align-items:flex-start;gap:14px;padding:9px 10px}
+.pop button.sw .sw-text{flex:1;min-width:0;line-height:1.4}
+.pop button.sw b{font-weight:500;display:block}
+.pop button.sw .d{display:block;font-size:12.5px;color:var(--muted)}
+.switch{width:30px;height:18px;border-radius:999px;background:var(--faint);position:relative;flex-shrink:0;margin-top:2px;transition:background .15s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--raised);transition:transform .2s var(--ease)}
+[aria-checked="true"]>.switch{background:var(--accent)}
+[aria-checked="true"]>.switch::after{transform:translateX(12px);background:var(--accent-ink)}
+
+/* ---------- settings: scheme swatches and choices ---------- */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-width:520px}
+.swatch{text-align:left;border-radius:13px;border:1px solid var(--line);background:var(--surface);padding:5px 5px 8px;transition:border-color .15s,transform .15s}
+.swatch:hover{border-color:var(--faint)}
+.swatch:active{transform:scale(.985)}
+.swatch[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.sw-prev{display:grid;grid-template-columns:1fr 1fr;border-radius:9px;overflow:hidden;height:74px;border:1px solid var(--line)}
+.sw-half{display:grid;grid-template-columns:13px 1fr;background:var(--bg);color-scheme:normal}
+.sw-half i{display:block}
+.sw-main{background:var(--surface);border-left:1px solid var(--line);padding:8px 7px 7px;display:flex;flex-direction:column;gap:4px}
+.sw-main .u{align-self:flex-end;width:55%;height:9px;border-radius:5px 5px 2px 5px;background:var(--user)}
+.sw-main .l1{width:82%;height:3px;border-radius:2px;background:var(--ink)}
+.sw-main .l2{width:58%;height:3px;border-radius:2px;background:var(--muted)}
+.sw-main .c{margin-top:auto;height:15px;border-radius:5px;background:var(--raised);border:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;padding:0 2px}
+.sw-main .c i{width:9px;height:9px;border-radius:3px;background:var(--accent)}
+.sw-name{display:flex;align-items:center;justify-content:space-between;padding:8px 6px 0;font-weight:500}
+.sw-name svg{color:var(--accent);visibility:hidden}
+.swatch[aria-checked="true"] .sw-name svg{visibility:visible}
+.choices{display:grid;gap:2px;max-width:520px;border:1px solid var(--line);border-radius:12px;padding:4px}
+.choices .opt{align-items:center}
+.inline-row{display:flex;gap:8px;align-items:center}
+
 /* empty state */
 .welcome{max-width:560px;margin:14vh auto 0;padding:0 28px;text-align:left}
 .welcome h1{font-family:var(--prose);font-weight:400;font-size:34px;letter-spacing:-.015em;line-height:1.2;margin:0 0 8px}
@@ -173,7 +381,10 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
 .box textarea::placeholder{color:var(--faint)}
 .box-row{display:flex;align-items:center;gap:6px;padding:6px 8px 8px 10px}
 .chip{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;color:var(--muted);font-size:12.5px}
-.chip:hover{background:var(--line-soft);color:var(--ink)}
+.chip:hover,.chip[aria-expanded="true"]{background:var(--line-soft);color:var(--ink)}
+.chip .n{font-variant-numeric:tabular-nums;color:var(--faint)}
+.chip.partial .n{color:var(--ink)}
+.chip.off{color:var(--faint)}
 .send{margin-left:auto;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);transition:background .15s,transform .15s,opacity .15s}
 .send:hover{background:var(--accent-hover)}
 .send:active{transform:scale(.92)}
@@ -278,8 +489,20 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
 .confirm .row{display:flex;justify-content:flex-end;gap:8px}
 
 .mobile-only{display:none}
+@media (max-width:1100px){
+  /* not enough room for three columns: the artifact panel slides over the thread instead */
+  .app.art-open{grid-template-columns:var(--sidebar) minmax(0,1fr) 0px}
+  .app.art-open.collapsed{grid-template-columns:0 minmax(0,1fr) 0px}
+  .art{position:fixed;z-index:39;top:0;right:0;bottom:0;width:min(600px,100vw);--art:min(600px,100vw);box-shadow:var(--shadow);transform:translateX(calc(100% + 64px));transition:transform .3s var(--ease),visibility 0s .3s}
+  .app.art-open .art{transform:none;transition:transform .3s var(--ease),visibility 0s}
+}
 @media (max-width:820px){
-  .app,.app.collapsed{grid-template-columns:0 1fr}
+  .art{width:100vw;--art:100vw;border-left:0}
+  .art-doc{padding:20px 18px 32px}
+  .acard{max-width:none}
+  .swatches{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+  .ctx .n-label{display:none}
+  .app,.app.collapsed,.app.art-open,.app.art-open.collapsed{grid-template-columns:0 minmax(0,1fr) 0px}
   .sidebar{position:fixed;z-index:46;top:0;bottom:0;left:0;width:var(--sidebar);background:var(--bg);transform:translateX(calc(-100% - 64px));transition:transform .3s var(--ease);box-shadow:var(--shadow)}
   .app.mobile-open .sidebar{transform:none}
   .main{border-left:0}
@@ -333,6 +556,10 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5l3 3 3-3"/></svg>
       </button>
       <div class="spacer"></div>
+      <button class="ctx" id="artBtn" title="Artifacts in this chat" aria-label="Artifacts in this chat" hidden>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M9.5 2.5v11"/></svg>
+        <span id="artCount">0</span><span class="n-label">artifacts</span>
+      </button>
       <button class="ctx" id="ctxBtn" title="Chat settings and context">
         <svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--line)" stroke-width="2.2"/><circle id="ctxRing" cx="9" cy="9" r="7" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="43.98" stroke-dashoffset="43.98" transform="rotate(-90 9 9)"/></svg>
         <span class="label" id="ctxLabel">0 / 8k</span>
@@ -357,6 +584,10 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3.5h10M3 8h10M3 12.5h6" stroke-linecap="round"/></svg>
               <span id="sysChipLabel">No system prompt</span>
             </button>
+            <button type="button" class="chip" id="toolsChip" aria-haspopup="true" aria-expanded="false" title="Tools the model may use">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 2.6a3.4 3.4 0 00-3.3 4.5L2.7 10.7a1.5 1.5 0 002.1 2.1l3.6-3.6a3.4 3.4 0 004.4-4.3l-2.1 2.1-1.9-.5-.5-1.9z"/></svg>
+              <span id="toolsChipLabel">Tools</span><span class="n" id="toolsChipN"></span>
+            </button>
             <button type="submit" class="send" id="send" aria-label="Send message" disabled>
               <svg class="i-send" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/></svg>
               <svg class="i-stop" width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="2.5" fill="currentColor"/></svg>
@@ -367,6 +598,30 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
       </div>
     </div>
   </main>
+
+  <aside class="art" id="artPane" aria-label="Artifacts">
+    <div class="art-inner">
+      <div class="art-head">
+        <button class="art-switch" id="artSwitch" aria-haspopup="true" aria-expanded="false" title="Switch artifact">
+          <span class="glyph" id="artGlyph"></span><span class="t" id="artTitle"></span><span class="count" id="artOf"></span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5l3 3 3-3"/></svg>
+        </button>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="artClose" aria-label="Close artifact panel" title="Close (Esc)"><svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      </div>
+      <div class="art-bar">
+        <div class="seg small" id="artTabs" role="tablist" aria-label="View">
+          <button role="tab" data-tab="preview" id="artTabPreview">Preview</button><button role="tab" data-tab="code" id="artTabCode">Code</button>
+        </div>
+        <div class="a-meta" id="artMeta"></div>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="artCopy" aria-label="Copy contents" title="Copy contents"></button>
+        <button class="icon-btn" id="artDownload" aria-label="Download" title="Download"></button>
+        <button class="icon-btn danger" id="artDelete" aria-label="Delete artifact" title="Delete artifact"></button>
+      </div>
+      <div class="art-view" id="artView" role="tabpanel"></div>
+    </div>
+  </aside>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -419,6 +674,7 @@ kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var
 </div>
 
 <div class="menu" id="menu"></div>
+<div class="menu pop" id="pop"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
@@ -437,6 +693,18 @@ const icon = {
   dots: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg>',
   trash: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/></svg>',
   plus: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
+  search: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14" stroke-linecap="round"/></svg>',
+  page: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5h5.5L12 5v8.5H4z"/><path d="M6.2 7.5h3.6M6.2 10.2h3.6"/></svg>',
+  alert: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5.8"/><path d="M8 5v3.4M8 10.9v.1"/></svg>',
+  ask: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.1 6.2a2 2 0 113 1.7c-.7.4-1.1.9-1.1 1.6M8 11.6v.1"/><circle cx="8" cy="8" r="5.8"/></svg>',
+  chev: '<svg class="chev" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 3l3 3-3 3"/></svg>',
+  spinner: '<svg class="spin" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 2.2a5.8 5.8 0 105.8 5.8" /></svg>',
+  download: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7.5M4.8 7.2L8 10.3l3.2-3.1M3 13h10"/></svg>',
+  mark: '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-6.5"/></svg>',
+  k_html: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2.5" y="3.5" width="13" height="11" rx="2.5"/><path d="M2.5 7h13"/></svg>',
+  k_svg: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="3.5"/><rect x="8" y="8" width="7" height="7" rx="1.5"/></svg>',
+  k_markdown: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5h6.5L14 5.5v10H4.5z"/><path d="M7 8.5h4.5M7 11.5h4.5"/></svg>',
+  k_code: '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 5.5L3 9l3.5 3.5M11.5 5.5L15 9l-3.5 3.5"/></svg>',
   refresh: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v3.5H9.5"/><path d="M12.6 6.5A5 5 0 103 9"/></svg>',
 };
 
@@ -444,7 +712,16 @@ const S = {
   providers: [], models: {}, modelErrors: {}, modelLoading: {},
   chats: [], chat: null, sel: { providerId: null, model: null },
   streaming: null, stick: true, query: '',
+  art: { open: false, id: null, tab: 'preview', opener: null },
+  tools: { artifacts: true, ask: true, web: true }, settings: null,
 };
+try { const t = JSON.parse(localStorage.getItem('sb:tools')); for (const k in S.tools) if (t && typeof t[k] === 'boolean') S.tools[k] = t[k]; } catch {}
+
+/* ---------- untrusted strings: text nodes only, and links must be http(s) ---------- */
+const safeUrl = u => { try { const x = new URL(String(u)); return x.protocol === 'http:' || x.protocol === 'https:' ? x.href : null; } catch { return null; } };
+const domainOf = u => { try { return new URL(String(u)).hostname.replace(/^www\./, '') || String(u); } catch { return String(u || 'a page'); } };
+const extLink = (url, attrs, ...kids) => { const href = safeUrl(url); return href ? el('a', { ...attrs, href, target: '_blank', rel: 'noopener noreferrer' }, ...kids) : el('span', attrs, ...kids); };
+const svg = (html, cls) => { const s = el('span', cls ? { class: cls } : {}); s.innerHTML = html; return cls ? s : s.firstChild; };
 
 /* ---------- markdown ---------- */
 const md = (() => {
@@ -526,7 +803,7 @@ function startRename(c) {
 async function deleteChat(c) {
   await api.chats.remove(c.id);
   S.chats = S.chats.filter(x => x.id !== c.id);
-  if (S.chat && S.chat.id === c.id) { S.chat = null; renderThread(); }
+  if (S.chat && S.chat.id === c.id) { S.chat = null; resetArt(); renderThread(); }
   renderSidebar();
   toast(`Deleted “${c.title}”`, 'Undo', async () => { await api.chats.restore(c.id); S.chats = await api.chats.list(); renderSidebar(); });
 }
@@ -583,7 +860,7 @@ function messageEl(m, isLast, animate) {
     wrap.append(tools);
   } else {
     wrap.append(el('div', { class: 'who' }, m.model || 'assistant'));
-    const body = el('div', { class: 'prose', dir: 'auto' }); body.innerHTML = md(m.content); wrap.append(body);
+    wrap.append(partsEl(m));
     if (m.stopped) wrap.append(el('div', { class: 'stopped' }, 'Stopped early'));
     const tools = el('div', { class: 'tools' });
     tools.append(toolBtn(icon.copy, 'Copy', b => copy(m.content, b)));
@@ -593,11 +870,110 @@ function messageEl(m, isLast, animate) {
   return wrap;
 }
 function toolBtn(svg, label, fn) { const b = el('button', { class: 'tool', type: 'button', 'aria-label': label, title: label }); b.innerHTML = svg + `<span>${label}</span>`; b.onclick = () => fn(b); return b; }
+
+/* ---------- message parts ----------
+   A message is a list of parts in the order they happened: prose, then a tool call, then more prose.
+   Old messages have no parts, so their content is treated as a single text part.
+   A tool part without a status is still running (only seen while streaming). */
+const partsOf = m => Array.isArray(m.parts) && m.parts.length ? m.parts : [{ type: 'text', text: m.content || '' }];
+function partsEl(m) { const box = el('div', { class: 'parts' }); for (const p of partsOf(m)) { const n = partEl(p); if (n) box.append(n); } return box; }
+function partEl(p) {
+  if (p.type === 'text') { if (!p.text || !p.text.trim()) return null; const n = el('div', { class: 'prose', dir: 'auto' }); n.innerHTML = md(p.text); return n; }
+  if (p.type !== 'tool') return null;
+  const n = toolEl(p); n._part = p; return n;
+}
+const row = (ico, cls, ...kids) => el('div', { class: 'trow' + (cls ? ' ' + cls : '') }, svg(ico), ...kids);
+function toolEl(p) {
+  const running = !p.status, a = p.args || {}, r = p.result || {};
+  if (p.status === 'error') {
+    const what = { web_search: 'The web search failed', fetch_page: a.url ? `Couldn’t read ${domainOf(a.url)}` : 'Couldn’t read the page', create_artifact: 'Couldn’t create the artifact', update_artifact: 'Couldn’t update the artifact', ask_user: 'Couldn’t ask the question' }[p.name] || `${p.name} failed`;
+    return row(icon.alert, 'err', el('span', { class: 't-text' }, el('b', {}, what + '. '), p.error || ''));
+  }
+  switch (p.name) {
+    case 'web_search': return searchEl(p, running);
+    case 'fetch_page': {
+      const url = r.url || a.url;
+      if (running) return row(icon.spinner, '', el('span', { class: 't-text' }, url ? `Reading ${domainOf(url)}…` : 'Reading a page…'));
+      return row(icon.page, '', el('span', { class: 't-text' }, 'Read ', extLink(url, {}, domainOf(url))), r.title ? el('span', { class: 't-aside' }, r.title) : '');
+    }
+    case 'create_artifact': case 'update_artifact': return artCard(p, running);
+    case 'ask_user': return running ? row(icon.spinner, '', el('span', { class: 't-text' }, 'Writing a question…')) : askEl(p);
+    default: return row(running ? icon.spinner : icon.check, '', el('span', { class: 't-text' }, running ? `Running ${p.name}…` : `Ran ${p.name}`));
+  }
+}
+function searchEl(p, running) {
+  const q = (p.result && p.result.query) || (p.args && p.args.query) || '';
+  const quoted = q ? el('q', {}, q) : '';
+  if (running) return row(icon.spinner, '', el('span', { class: 't-text' }, q ? 'Searching the web for ' : 'Searching the web…', quoted, q ? '…' : ''));
+  const results = Array.isArray(p.result && p.result.results) ? p.result.results : [];
+  const label = el('span', { class: 't-text' }, 'Searched the web for ', quoted);
+  if (!results.length) return row(icon.search, '', label, el('span', { class: 't-aside' }, 'No results'));
+  const list = el('ul', { class: 'results', hidden: '' }, ...results.map(x => el('li', {}, extLink(x.url, { class: 'res' },
+    el('span', { class: 'res-top' }, el('span', { class: 'res-t' }, x.title || domainOf(x.url)), el('span', { class: 'res-d' }, safeUrl(x.url) ? domainOf(x.url) : 'link not shown')),
+    x.snippet ? el('span', { class: 'res-s' }, x.snippet) : ''))));
+  const btn = el('button', { class: 'trow', type: 'button', 'aria-expanded': 'false', onclick: () => { const open = list.hidden; list.hidden = !open; btn.setAttribute('aria-expanded', String(open)); } },
+    svg(icon.search), label, el('span', { class: 't-aside' }, `${results.length} result${results.length === 1 ? '' : 's'}`), svg(icon.chev));
+  return el('div', { class: 'tsearch' }, btn, list);
+}
+
+/* artifact card: the inline handle for something that lives in the panel */
+const KIND = { html: 'HTML page', svg: 'SVG image', markdown: 'Document', code: 'Code' };
+const langName = l => { const g = window.hljs && l && hljs.getLanguage(String(l)); return (g && g.name) || l; };
+const kindLabel = a => a.kind === 'code' ? (langName(a.language) || 'Code') : (KIND[a.kind] || a.kind || 'Artifact');
+const glyph = kind => svg(icon['k_' + kind] || icon.k_code, 'glyph');
+function artCard(p, running) {
+  const a = p.args || {}, r = p.result || {}, update = p.name === 'update_artifact';
+  const id = r.artifactId || (update ? a.id : null), live = id ? artById(id) : null;
+  if (running) {
+    const g = el('span', { class: 'glyph' }); g.innerHTML = icon.spinner;
+    return el('div', { class: 'acard', 'aria-busy': 'true' }, g, el('span', { class: 'a-text' },
+      el('span', { class: 'a-title' }, a.title || (live && live.title) || (update ? 'Artifact' : 'New artifact')),
+      el('span', { class: 'a-meta' }, update ? 'Rewriting…' : 'Writing…')));
+  }
+  const gone = !live, title = (live && !update ? live.title : r.title) || 'Untitled';
+  return el('button', { class: 'acard' + (gone ? ' gone' : '') + (!gone && S.art.open && S.art.id === id ? ' current' : ''), type: 'button', 'data-art': id || '', disabled: gone ? '' : null,
+    'aria-label': gone ? `${title}, deleted` : `Open ${title}`, onclick: e => openArtifact(id, e.currentTarget) },
+    glyph(r.kind), el('span', { class: 'a-text' }, el('span', { class: 'a-title' }, title),
+      el('span', { class: 'a-meta' }, gone ? 'Deleted' : (update ? 'Updated ' : '') + kindLabel(r), gone || !r.version ? '' : el('span', { class: 'ver' }, 'v' + r.version))),
+    gone ? '' : el('span', { class: 'a-go' }, 'Open'));
+}
+function refreshCards() { document.querySelectorAll('#thread .acard').forEach(n => { if (n._part) { const f = toolEl(n._part); f._part = n._part; n.replaceWith(f); } }); }
+
+/* question card: the model asked, the user picks or types */
+function askEl(p) {
+  const a = p.args || {}, question = a.question || 'The model has a question';
+  if (p.status !== 'pending') {
+    const ans = p.result && p.result.answer;
+    return el('div', { class: 'asked' }, row(icon.ask, '', el('span', { class: 't-text', style: 'white-space:normal' }, question), ans ? '' : el('span', { class: 't-aside' }, 'Skipped')),
+      ans ? el('div', { class: 'bubble', dir: 'auto' }, el('span', { class: 'sr' }, 'Your answer: '), ans) : '');
+  }
+  const opts = (Array.isArray(a.options) ? a.options : []).filter(o => o && o.label).slice(0, 4), multi = !!a.multiple, chosen = new Set();
+  const other = el('input', { class: 'input', dir: 'auto', autocomplete: 'off', placeholder: opts.length ? 'Something else' : 'Your answer', 'aria-label': opts.length ? 'Something else' : 'Your answer' });
+  const submit = el('button', { class: 'btn primary', type: 'submit', disabled: '' }, 'Send answer');
+  const btns = opts.map((o, i) => el('button', { class: 'opt', type: 'button', role: multi ? 'checkbox' : 'radio', 'aria-checked': 'false',
+    onclick: () => { if (chosen.has(i)) chosen.delete(i); else { if (!multi) { chosen.clear(); other.value = ''; } chosen.add(i); } sync(); },
+    onkeydown: e => { const d = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0; if (d) { e.preventDefault(); (btns[i + d] || (d > 0 ? other : btns[i])).focus(); } } },
+    svg(icon.mark, 'mark'), el('span', {}, el('b', {}, o.label), o.description ? el('span', { class: 'd' }, o.description) : '')));
+  const sync = () => { btns.forEach((b, i) => b.setAttribute('aria-checked', String(chosen.has(i)))); submit.disabled = !chosen.size && !other.value.trim(); };
+  other.addEventListener('input', () => { if (!multi && other.value.trim()) chosen.clear(); sync(); });
+  other.addEventListener('keydown', e => { if (e.key === 'ArrowUp' && btns.length) { e.preventDefault(); btns.at(-1).focus(); } if (e.key === 'Escape') { e.stopPropagation(); input.focus(); } });
+  return el('form', { class: 'ask', onsubmit: e => {
+      e.preventDefault(); if (S.streaming) return;
+      const text = [...opts.filter((o, i) => chosen.has(i)).map(o => o.label), other.value.trim()].filter(Boolean).join(', ');
+      if (text) send({ answer: { callId: p.id, text } });
+    } },
+    el('p', { class: 'ask-q', dir: 'auto' }, question),
+    el('p', { class: 'ask-how' }, !opts.length ? 'Type your answer, or just keep chatting to skip.' : multi ? 'Pick any that fit, or write your own.' : 'Pick one, or write your own.'),
+    opts.length ? el('div', { class: 'opts', role: multi ? 'group' : 'radiogroup', 'aria-label': question }, ...btns) : '',
+    el('div', { class: 'ask-foot' }, other, submit));
+}
 async function copy(text, btn) {
   try { await navigator.clipboard.writeText(text); } catch { toast('Copy was blocked by the browser'); return; }
   if (btn) { const old = btn.innerHTML; btn.classList.add('done'); btn.innerHTML = icon.check + '<span>Copied</span>'; setTimeout(() => { btn.classList.remove('done'); btn.innerHTML = old; }, 1400); }
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-copy-code]'); if (!b) return; const code = b.closest('.code').querySelector('code').innerText; navigator.clipboard.writeText(code).then(() => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1400); }, () => toast('Copy was blocked by the browser')); });
+
+document.addEventListener('click', e => { const a = e.target.closest('.prose a[href]'); if (a) { a.target = '_blank'; a.rel = 'noopener noreferrer'; } }, true);
 
 function editMessage(wrap, m) {
   if (S.streaming) return;
@@ -628,42 +1004,71 @@ $('#composer').addEventListener('submit', e => {
   input.value = ''; autosize(); send({ content: v });
 });
 
-async function send({ content, editMessageId, regenerate }) {
+/* send covers four cases: a new message, an edited one, a regenerate, and an answer to a question the model asked.
+   An answer adds no user message; the reply continues in a new assistant message. */
+async function send({ content, editMessageId, regenerate, answer }) {
   if (S.streaming) return;
   let created = false;
-  if (!S.chat) { S.chat = await api.chats.create({ providerId: S.sel.providerId, model: S.sel.model, ...(S.draft || {}) }); S.draft = null; created = true; }
+  if (!S.chat) { S.chat = await api.chats.create({ providerId: S.sel.providerId, model: S.sel.model, ...(S.draft || {}) }); S.draft = null; created = true; if (!S.chat.artifacts) S.chat.artifacts = []; }
   const chat = S.chat, t = $('#thread');
   // optimistic local update
-  if (editMessageId) { const i = chat.messages.findIndex(m => m.id === editMessageId); chat.messages.splice(i); }
-  if (regenerate) { while (chat.messages.length && chat.messages.at(-1).role === 'assistant') chat.messages.pop(); }
-  else chat.messages.push({ id: 'tmp', role: 'user', content });
-  renderThread({ animateLast: !regenerate, sending: true });
+  let asked = null, answered = false;
+  if (answer) {
+    for (const m of chat.messages) for (const p of m.parts || []) if (p.type === 'tool' && p.id === answer.callId) asked = { m, p };
+    if (!asked) return;
+    Object.assign(asked.p, { status: 'done', result: { answer: answer.text } }); repaintMessage(asked.m);
+  } else {
+    // a normal message while a question is waiting skips the question
+    for (const m of chat.messages) for (const p of m.parts || []) if (p.type === 'tool' && p.status === 'pending') Object.assign(p, { status: 'done', result: { answer: '' } });
+    if (editMessageId) { const i = chat.messages.findIndex(m => m.id === editMessageId); forgetArtifacts(chat.messages.splice(i)); }
+    if (regenerate) { const cut = []; while (chat.messages.length && chat.messages.at(-1).role === 'assistant') cut.push(chat.messages.pop()); forgetArtifacts(cut); }
+    else chat.messages.push({ id: 'tmp', role: 'user', content });
+    renderThread({ animateLast: !regenerate, sending: true });
+  }
   if (created) { S.chats.unshift({ ...chat }); renderSidebar(); }
 
-  // streaming placeholder
-  const live = el('div', { class: 'msg assistant enter' }, el('div', { class: 'who' }, S.sel.model), el('div', { class: 'prose', dir: 'auto' }));
-  const body = live.querySelector('.prose');
-  body.innerHTML = '<div class="thinking"><i></i><i></i><i></i></div>';
+  // streaming placeholder: one node per part, so finished tool rows are left alone while text keeps arriving
+  const box = el('div', { class: 'parts' }), dots = el('div', { class: 'thinking' }, el('i'), el('i'), el('i'));
+  const live = el('div', { class: 'msg assistant enter' }, el('div', { class: 'who' }, S.sel.model), box);
+  box.append(dots);
   t.querySelectorAll('.msg.last').forEach(n => n.classList.remove('last'));
   t.append(live); S.stick = true; toBottom(true);
 
   const ctrl = new AbortController(); S.streaming = ctrl; syncSend();
-  let buf = '', raf = 0;
-  const paint = () => { raf = 0; body.innerHTML = md(buf); const last = body.lastElementChild; const caret = el('span', { class: 'caret' }); const target = !last ? body : last.classList.contains('code') ? last.querySelector('code') : /^(P|LI|H\d)$/.test(last.tagName) ? last : (last.matches('ul,ol') ? last.lastElementChild || last : body); target.append(caret); if (S.stick) toBottom(false); };
+  const parts = [], nodes = [];
+  let raf = 0;
+  const follow = () => { if (S.stick) toBottom(false); };
+  const waiting = on => { if (on) box.append(dots); else dots.remove(); };
+  const paintText = (i, caret) => {
+    let n = nodes[i]; if (!n) { n = nodes[i] = el('div', { class: 'prose', dir: 'auto' }); box.append(n); }
+    n.innerHTML = md(parts[i].text);
+    if (caret) { const last = n.lastElementChild; const target = !last ? n : last.classList.contains('code') ? last.querySelector('code') : /^(P|LI|H\d)$/.test(last.tagName) ? last : (last.matches('ul,ol') ? last.lastElementChild || last : n); target.append(el('span', { class: 'caret' })); }
+  };
+  const paint = () => { raf = 0; const i = parts.length - 1; if (i >= 0 && parts[i].type === 'text') paintText(i, true); follow(); };
+  const settleText = () => { cancelAnimationFrame(raf); raf = 0; const i = parts.length - 1; if (i >= 0 && parts[i].type === 'text') paintText(i, false); };
+  const paintTool = i => { const n = toolEl(parts[i]); n._part = parts[i]; if (nodes[i]) nodes[i].replaceWith(n); else box.append(n); nodes[i] = n; follow(); };
+  const toolAt = (id, name) => { let i = parts.findIndex(p => p.type === 'tool' && p.id === id); if (i < 0) { settleText(); i = parts.push({ type: 'tool', id, name, args: null, result: null }) - 1; } return i; };
   try {
-    const res = await api.chats.send(chat.id, { content, providerId: S.sel.providerId, model: S.sel.model, editMessageId, regenerate }, {
+    const res = await api.chats.send(chat.id, { content: answer ? '' : content, providerId: S.sel.providerId, model: S.sel.model, editMessageId, regenerate, tools: enabledTools(), ...(answer ? { answer } : {}) }, {
       signal: ctrl.signal,
-      onUser: um => { const tmp = chat.messages.find(m => m.id === 'tmp'); if (tmp) tmp.id = um.id; },
-      onToken: tok => { buf += tok; if (!raf) raf = requestAnimationFrame(paint); },
+      onUser: um => { const tmp = chat.messages.find(m => m.id === 'tmp'); if (tmp) { tmp.id = um.id; if (um.createdAt) tmp.createdAt = um.createdAt; } },
+      onAnswered: ({ messageId, part }) => { answered = true; if (asked && part) { Object.assign(asked.p, part); repaintMessage(asked.m); } },
+      onToken: tok => { waiting(false); const last = parts.at(-1); if (last && last.type === 'text') last.text += tok; else parts.push({ type: 'text', text: tok }); if (!raf) raf = requestAnimationFrame(paint); },
+      onToolStart: ({ id, name }) => { waiting(false); paintTool(toolAt(id, name)); },
+      onToolRun: ({ id, name, args }) => { waiting(false); const i = toolAt(id, name); parts[i].args = args; paintTool(i); },
+      onToolEnd: part => { const i = toolAt(part.id, part.name); parts[i] = part; paintTool(i); waiting(part.status !== 'pending'); follow(); },
+      onArtifact: a => { if (S.chat === chat) putArtifact(a); },
     });
     cancelAnimationFrame(raf);
-    if (!res.message.content) { live.remove(); return; }
-    chat.messages.push(res.message);
+    const msg = res.message;
+    if (!msg.content && !(msg.parts && msg.parts.length)) { live.remove(); return; }
+    chat.messages.push(msg);
     if (res.title) { chat.title = res.title; }
     const row = S.chats.find(c => c.id === chat.id); if (row) { row.title = chat.title; row.updatedAt = Date.now(); }
     S.chats.sort((a, b) => b.updatedAt - a.updatedAt);
-    live.replaceWith(messageEl(res.message, true, false));
+    live.replaceWith(messageEl(msg, true, false));
     renderSidebar(res.title ? chat.id : null);
+    if (S.stick) toBottom(false);
   } catch (err) {
     cancelAnimationFrame(raf);
     const tmpIdx = chat.messages.findIndex(m => m.id === 'tmp');
@@ -672,27 +1077,206 @@ async function send({ content, editMessageId, regenerate }) {
       if (!input.value) { input.value = content; autosize(); }
       toast(err.message); return;
     }
+    if (asked && !answered) {
+      live.remove(); toast(err.message);
+      if (err.status === 409) { // the backend no longer has this question open: show what it has instead
+        const fresh = await api.chats.get(chat.id).catch(() => null);
+        if (fresh && S.chat === chat) { chat.messages = fresh.messages; chat.artifacts = fresh.artifacts || []; renderThread(); renderArtBtn(); if (S.art.open) renderArt(); }
+      } else { Object.assign(asked.p, { status: 'pending', result: null }); repaintMessage(asked.m); } // never arrived: reopen the question
+      return;
+    }
+    settleText(); waiting(false);
     const retry = el('button', { type: 'button', onclick: () => { live.remove(); send({ regenerate: true }); } }, 'Retry');
-    body.replaceWith(el('div', { class: 'msg-error' }, err.message, retry));
+    box.append(el('div', { class: 'msg-error' }, err.message, retry));
   } finally {
     S.streaming = null; syncSend(); renderContext();
     // keep last-message tools visible on the right node
     t.querySelectorAll('.msg').forEach((n, i, a) => n.classList.toggle('last', i === a.length - 1));
   }
 }
+function repaintMessage(m) {
+  const old = document.querySelector(`#thread .msg[data-id="${CSS.escape(String(m.id))}"]`); if (!old) return;
+  old.replaceWith(messageEl(m, old.classList.contains('last'), false));
+}
+
+/* ---------- artifacts ----------
+   Pages, drawings, documents and code the model wrote with its artifact tools. They belong to the chat
+   and show in the panel beside the thread; the cards in the thread are handles that open them. */
+const arts = () => (S.chat && S.chat.artifacts) || [];
+const artById = id => arts().find(a => a.id === id);
+const artOverlays = () => matchMedia('(max-width:1100px)').matches;
+function putArtifact(a) {
+  const list = S.chat.artifacts || (S.chat.artifacts = []), i = list.findIndex(x => x.id === a.id);
+  if (i > -1) list[i] = a; else list.push(a);
+  renderArtBtn();
+  if (i < 0 && !artOverlays()) { S.art.tab = 'preview'; openArtifact(a.id); }       // a new one opens itself when there is room beside the thread
+  else if (S.art.open && S.art.id === a.id) renderArt();  // the one on screen updates live
+}
+/* editing or regenerating removes the artifacts that the dropped messages created (the backend does the same) */
+function forgetArtifacts(msgs) {
+  const ids = new Set(); for (const m of msgs) for (const p of m.parts || []) if (p.type === 'tool' && p.name === 'create_artifact' && p.result) ids.add(p.result.artifactId);
+  if (!ids.size || !S.chat.artifacts) return;
+  S.chat.artifacts = S.chat.artifacts.filter(a => !ids.has(a.id));
+  renderArtBtn(); if (S.art.open) renderArt();
+}
+function renderArtBtn() { const n = arts().length; $('#artBtn').hidden = !n; $('#artCount').textContent = n; $('#artBtn').querySelector('.n-label').textContent = n === 1 ? 'artifact' : 'artifacts'; }
+function openArtifact(id, opener) {
+  if (!artById(id)) return;
+  if (opener) S.art.opener = opener;
+  S.art.id = id; S.art.open = true; renderArt();
+  if (opener) setTimeout(() => $('#artSwitch').focus({ preventScroll: true }), 60);
+}
+function closeArt(refocus) {
+  if (!S.art.open) return;
+  S.art.open = false; closePop(); renderArt();
+  if (refocus) { const o = S.art.opener; (o && o.isConnected && !o.disabled ? o : input).focus(); }
+}
+let artKey = '';
+function renderArt() {
+  let a = artById(S.art.id);
+  if (S.art.open && !a) { a = arts().at(-1); if (a) S.art.id = a.id; else S.art.open = false; }
+  $('#app').classList.toggle('art-open', S.art.open);
+  document.querySelectorAll('#thread .acard[data-art]').forEach(n => n.classList.toggle('current', S.art.open && n.dataset.art === S.art.id));
+  if (!S.art.open || !a) { if (!S.art.open) setTimeout(() => { if (!S.art.open) { $('#artView').replaceChildren(); artKey = ''; } }, 340); return; }
+  const all = arts(), hasPreview = a.kind !== 'code', tab = hasPreview ? S.art.tab : 'code';
+  $('#artGlyph').innerHTML = icon['k_' + a.kind] || icon.k_code;
+  $('#artTitle').textContent = a.title || 'Untitled';
+  $('#artOf').textContent = all.length > 1 ? `${all.indexOf(a) + 1} of ${all.length}` : '';
+  $('#artMeta').replaceChildren(kindLabel(a), el('span', { class: 'ver' }, 'v' + (a.version || 1)));
+  $('#artTabs').hidden = !hasPreview;
+  document.querySelectorAll('#artTabs [role=tab]').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
+  const key = [a.id, a.version, a.updatedAt, tab, (a.content || '').length].join('|');
+  if (key === artKey) return; artKey = key;
+  const view = $('#artView'); view.setAttribute('aria-label', `${a.title || 'Artifact'}, ${tab}`);
+  view.replaceChildren(tab === 'code' ? codeView(a) : previewView(a));
+}
+/* Untrusted markup only ever runs inside a sandboxed frame with its own opaque origin:
+   scripts may run, but there is no access to this page, its storage or the API. */
+function sandbox(doc, title) {
+  const f = el('iframe', { sandbox: 'allow-scripts', referrerpolicy: 'no-referrer', title });
+  f.srcdoc = doc; return f;
+}
+function previewView(a) {
+  const body = a.content || '';
+  if (a.kind === 'html') return sandbox(body, a.title || 'Preview');
+  if (a.kind === 'svg') return sandbox('<!doctype html><meta charset="utf-8"><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#fff;padding:24px;box-sizing:border-box}svg{max-width:100%;max-height:100%;height:auto}</style>' + body, a.title || 'Preview');
+  if (a.kind === 'markdown') { const d = el('div', { class: 'prose art-doc', dir: 'auto' }); d.innerHTML = md(body); return el('div', { class: 'art-scroll' }, d); }
+  return codeView(a);
+}
+function codeView(a) {
+  const body = a.content || '', code = el('code', {});
+  const lang = { html: 'xml', svg: 'xml', markdown: 'markdown' }[a.kind] || String(a.language || '').toLowerCase();
+  let html = null;
+  if (window.hljs && body.length < 300000) { try { html = lang && hljs.getLanguage(lang) ? hljs.highlight(body, { language: lang }).value : a.kind === 'code' ? hljs.highlightAuto(body).value : null; } catch {} }
+  if (html != null) code.innerHTML = html; else code.textContent = body; // highlight.js escapes its input
+  return el('div', { class: 'art-scroll code', tabindex: '0' }, el('pre', { class: 'art-code' }, code));
+}
+const EXT = { python: 'py', py: 'py', javascript: 'js', js: 'js', typescript: 'ts', ts: 'ts', jsx: 'jsx', tsx: 'tsx', go: 'go', golang: 'go', rust: 'rs', c: 'c', cpp: 'cpp', 'c++': 'cpp', csharp: 'cs', 'c#': 'cs', java: 'java', kotlin: 'kt', swift: 'swift', ruby: 'rb', php: 'php', bash: 'sh', shell: 'sh', sh: 'sh', zsh: 'sh', powershell: 'ps1', sql: 'sql', json: 'json', yaml: 'yml', yml: 'yml', toml: 'toml', xml: 'xml', html: 'html', css: 'css', scss: 'scss', markdown: 'md', lua: 'lua', r: 'r', perl: 'pl', dart: 'dart', scala: 'scala', haskell: 'hs', elixir: 'ex', zig: 'zig' };
+function artFilename(a) {
+  const ext = { html: 'html', svg: 'svg', markdown: 'md' }[a.kind] || EXT[String(a.language || '').toLowerCase()] || 'txt';
+  const base = String(a.title || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').replace(/^[\s.]+|[\s.]+$/g, '').slice(0, 80) || 'artifact';
+  return base.toLowerCase().endsWith('.' + ext) ? base : `${base}.${ext}`;
+}
+function flash(btn) { const old = btn.innerHTML; btn.classList.add('done'); btn.innerHTML = icon.check.replace(/"14"/g, '"16"'); setTimeout(() => { btn.classList.remove('done'); btn.innerHTML = old; }, 1400); }
+$('#artCopy').innerHTML = icon.copy.replace(/"14"/g, '"16"'); $('#artDownload').innerHTML = icon.download; $('#artDelete').innerHTML = icon.trash.replace(/"14"/g, '"16"');
+$('#artCopy').onclick = async e => { const a = artById(S.art.id), b = e.currentTarget; if (!a) return; try { await navigator.clipboard.writeText(a.content || ''); flash(b); } catch { toast('Copy was blocked by the browser'); } };
+$('#artDownload').onclick = () => {
+  const a = artById(S.art.id); if (!a) return;
+  const url = URL.createObjectURL(new Blob([a.content || ''], { type: 'application/octet-stream' })), name = artFilename(a);
+  const link = el('a', { href: url, download: name }); document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000); toast(`Downloaded ${name}`);
+};
+$('#artDelete').onclick = () => {
+  const a = artById(S.art.id); if (!a) return;
+  confirmBox(`Delete “${a.title || 'Untitled'}”?`, 'It is removed from this chat for good. The messages that mention it stay.', 'Delete', async () => {
+    const chat = S.chat;
+    try { await api.artifacts.remove(a.id); } catch (e) { if (e.status !== 404) throw e; } // 404: already deleted
+    chat.artifacts = (chat.artifacts || []).filter(x => x.id !== a.id);
+    if (S.chat !== chat) return;
+    const had = S.art.open; renderArtBtn(); renderArt(); refreshCards();
+    if (had && !S.art.open) input.focus();
+    toast(`Deleted “${a.title || 'Untitled'}”`);
+  });
+};
+$('#artClose').onclick = () => closeArt(true);
+$('#artBtn').onclick = e => { if (S.art.open) closeArt(); else openArtifact(artById(S.art.id) ? S.art.id : arts().at(-1)?.id, e.currentTarget); };
+$('#artTabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { S.art.tab = b.dataset.tab; renderArt(); } });
+$('#artTabs').addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); S.art.tab = S.art.tab === 'preview' ? 'code' : 'preview'; renderArt(); $('#artTabs .on').focus(); });
+$('#artSwitch').onclick = e => {
+  const cur = S.art.id, list = el('div', { role: 'listbox', 'aria-label': 'Artifacts in this chat' }, el('div', { class: 'pop-label' }, 'In this chat'));
+  for (const a of arts()) list.append(el('button', { type: 'button', role: 'option', 'aria-selected': String(a.id === cur), onclick: () => { closePop(true); S.art.id = a.id; renderArt(); } },
+    glyph(a.kind), el('span', { class: 'a-text' }, el('span', { class: 'a-title' }, a.title || 'Untitled'), el('span', { class: 'a-meta' }, kindLabel(a), el('span', { class: 'ver' }, 'v' + (a.version || 1)))), svg(icon.check, 'check')));
+  togglePop(e.currentTarget, list);
+};
+
+/* ---------- popover (artifact switcher, tools menu) ---------- */
+let popAnchor = null;
+function togglePop(anchor, node, above) {
+  if (popAnchor === anchor) return closePop(true);
+  closePop(); hideMenu();
+  const m = $('#pop'); m.replaceChildren(node); popAnchor = anchor; anchor.setAttribute('aria-expanded', 'true');
+  const r = anchor.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+  m.style.top = Math.max(8, above ? r.top - h - 6 : Math.min(r.bottom + 6, innerHeight - h - 8)) + 'px';
+  m.style.transformOrigin = above ? 'bottom left' : 'top left';
+  m.classList.add('show');
+  const first = m.querySelector('[aria-selected="true"]') || m.querySelector('button'); if (first) first.focus({ preventScroll: true });
+}
+function closePop(refocus) {
+  if (!popAnchor) return;
+  const a = popAnchor; popAnchor = null; $('#pop').classList.remove('show'); a.setAttribute('aria-expanded', 'false');
+  if (refocus && a.isConnected) a.focus({ preventScroll: true });
+}
+document.addEventListener('pointerdown', e => { if (popAnchor && !$('#pop').contains(e.target) && !popAnchor.contains(e.target)) closePop(); });
+$('#pop').addEventListener('focusout', e => { if (popAnchor && e.relatedTarget && !$('#pop').contains(e.relatedTarget) && e.relatedTarget !== popAnchor) closePop(); });
+$('#pop').addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const bs = [...$('#pop').querySelectorAll('button')], i = bs.indexOf(document.activeElement); if (!bs.length) return;
+  e.preventDefault(); bs[(i + (e.key === 'ArrowDown' ? 1 : bs.length - 1)) % bs.length].focus();
+});
+window.addEventListener('resize', () => closePop());
+
+/* ---------- tools the model may use ---------- */
+const TOOL_GROUPS = [
+  ['artifacts', 'Artifacts', 'Pages, documents and code that open beside the chat'],
+  ['ask', 'Ask questions', 'Let the model check with you instead of guessing'],
+  ['web', 'Web search', 'Search the web and read pages'],
+];
+const enabledTools = () => TOOL_GROUPS.map(g => g[0]).filter(k => S.tools[k]);
+function renderToolsChip() {
+  const n = enabledTools().length, all = TOOL_GROUPS.length, chip = $('#toolsChip');
+  $('#toolsChipLabel').textContent = n ? 'Tools' : 'Tools off';
+  $('#toolsChipN').textContent = n && n < all ? `${n} of ${all}` : '';
+  chip.classList.toggle('partial', n > 0 && n < all); chip.classList.toggle('off', !n);
+}
+$('#toolsChip').onclick = e => {
+  const box = el('div', { role: 'group', 'aria-label': 'Tools the model may use' }, el('div', { class: 'pop-label' }, 'The model may use'));
+  for (const [key, name, sub] of TOOL_GROUPS) {
+    const b = el('button', { class: 'sw', type: 'button', role: 'switch', 'aria-checked': String(S.tools[key]), onclick: () => {
+      S.tools[key] = !S.tools[key]; b.setAttribute('aria-checked', String(S.tools[key]));
+      try { localStorage.setItem('sb:tools', JSON.stringify(S.tools)); } catch {}
+      renderToolsChip();
+    } }, el('span', { class: 'sw-text' }, el('b', {}, name), el('span', { class: 'd' }, sub)), el('span', { class: 'switch' }));
+    box.append(b);
+  }
+  togglePop(e.currentTarget, box, true);
+};
+renderToolsChip();
 
 /* ---------- chats ---------- */
 async function openChat(id) {
   if (S.streaming) S.streaming.abort();
   if (S.chat && S.chat.id === id) return closeMobile();
   S.chat = await api.chats.get(id);
-  if (S.chat) { S.sel = { providerId: S.chat.providerId, model: S.chat.model }; renderPill(); }
+  resetArt();
+  if (S.chat) { if (!Array.isArray(S.chat.artifacts)) S.chat.artifacts = []; S.sel = { providerId: S.chat.providerId, model: S.chat.model }; renderPill(); }
   renderSidebar(); renderThread({ fade: true }); loadChatPanel(); closeMobile();
 }
 function newChat() {
   if (S.streaming) S.streaming.abort();
-  S.chat = null; renderSidebar(); renderThread({ fade: true }); loadChatPanel(); closeMobile(); input.focus();
+  S.chat = null; resetArt(); renderSidebar(); renderThread({ fade: true }); loadChatPanel(); closeMobile(); input.focus();
 }
+function resetArt() { S.art.open = false; S.art.id = null; S.art.opener = null; closePop(); renderArt(); renderArtBtn(); }
 $('#newChat').onclick = newChat;
 $('#search').addEventListener('input', e => { S.query = e.target.value; renderSidebar(); });
 
@@ -787,7 +1371,8 @@ $('#ctxBtn').onclick = openPanel; $('#chatSettingsBtn').onclick = openPanel; $('
 
 /* ---------- settings modal (providers) ---------- */
 let editing = null; // provider id or null for new
-function openSettings(pid) { editing = pid === undefined ? (S.providers[0]?.id ?? null) : pid; renderSettings(); show('#settings'); if (editing) loadModels(editing); }
+const APP_PAGES = ['appearance', 'search'];
+function openSettings(pid) { editing = pid === undefined ? (S.providers[0]?.id ?? null) : pid; renderSettings(); show('#settings'); if (editing && !APP_PAGES.includes(editing)) loadModels(editing); }
 $('#openSettings').onclick = () => openSettings();
 function renderSettings() {
   const side = $('#settingsSide'); side.innerHTML = '';
@@ -799,15 +1384,24 @@ function renderSettings() {
   const add = el('button', { class: 'side-item add' + (editing === null ? ' active' : ''), onclick: () => { editing = null; renderSettings(); } }); add.innerHTML = icon.plus + 'Add provider'; side.append(add);
   side.append(el('div', { class: 'side-label' }, 'App'));
   side.append(el('button', { class: 'side-item' + (editing === 'appearance' ? ' active' : ''), onclick: () => { editing = 'appearance'; renderSettings(); } }, 'Appearance'));
+  side.append(el('button', { class: 'side-item' + (editing === 'search' ? ' active' : ''), onclick: () => { editing = 'search'; searchDraft = null; renderSettings(); } }, 'Web search'));
 
   const content = $('#settingsContent'), actions = $('#settingsActions'); content.innerHTML = ''; actions.innerHTML = '';
   if (editing === 'appearance') {
     $('#settingsTitle').textContent = 'Appearance';
-    const cur = currentThemePref();
-    const seg = el('div', { class: 'seg' }, ...['system', 'light', 'dark'].map(v => el('button', { class: cur === v ? 'on' : '', onclick: () => { setTheme(v); renderSettings(); } }, v[0].toUpperCase() + v.slice(1))));
-    content.append(el('div', { class: 'field' }, el('label', {}, 'Theme'), seg));
+    const cur = currentThemePref(), scheme = currentScheme();
+    const seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Mode' }, ...['system', 'light', 'dark'].map(v => el('button', { class: cur === v ? 'on' : '', role: 'radio', 'aria-checked': String(cur === v), 'data-mode': v, onclick: () => { setTheme(v); renderSettings(); $(`#settingsContent [data-mode="${v}"]`).focus(); } }, v[0].toUpperCase() + v.slice(1))));
+    const half = (id, mode) => el('span', { class: 'sw-half', 'data-scheme': id, 'data-theme': mode }, el('i'), el('span', { class: 'sw-main' }, el('i', { class: 'u' }), el('i', { class: 'l1' }), el('i', { class: 'l2' }), el('span', { class: 'c' }, el('i'))));
+    const cards = SCHEMES.map(([id, name, note], i) => el('button', { class: 'swatch', type: 'button', role: 'radio', 'aria-checked': String(scheme === id), 'aria-label': `${name}: ${note}`, title: note, 'data-scheme-pick': id, tabindex: scheme === id ? '0' : '-1',
+      onclick: () => pickScheme(id),
+      onkeydown: e => { const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]; if (d) { e.preventDefault(); pickScheme(SCHEMES[(i + d + SCHEMES.length) % SCHEMES.length][0]); } } },
+      el('span', { class: 'sw-prev', 'aria-hidden': 'true' }, half(id, 'light'), half(id, 'dark')), el('span', { class: 'sw-name' }, name, svg(icon.check))));
+    content.append(el('div', { class: 'field' }, el('label', {}, 'Mode'), el('p', { class: 'sub' }, 'System follows your device and switches with it.'), seg),
+      el('div', { class: 'field', style: 'max-width:none' }, el('label', { id: 'schemeLabel' }, 'Colour scheme'), el('p', { class: 'sub' }, 'Each one has a light and a dark side. The mode above decides which you see.'),
+        el('div', { class: 'swatches', role: 'radiogroup', 'aria-labelledby': 'schemeLabel' }, ...cards)));
     return;
   }
+  if (editing === 'search') { renderSearchSettings(content, actions); return; }
   const p = S.providers.find(x => x.id === editing);
   $('#settingsTitle').textContent = p ? p.name : 'Add a provider';
   const f = (id, label, sub, attrs) => el('div', { class: 'field' }, el('label', { for: id }, label), sub ? el('p', { class: 'sub' }, sub) : '', el('input', { class: 'input', id, ...attrs }));
@@ -829,13 +1423,55 @@ function renderSettings() {
   actions.append(save);
   if (p) actions.append(el('button', { class: 'btn danger', style: 'margin-left:auto', onclick: () => confirmBox(`Remove ${p.name}?`, 'Chats that used it stay, but you’ll need to pick another model to continue them.', 'Remove', () => removeProvider(p)) }, 'Remove provider'));
 }
+function pickScheme(id) { setScheme(id); renderSettings(); const b = $(`#settingsContent [data-scheme-pick="${id}"]`); if (b) b.focus(); }
+
+/* web search: which service the model's web_search tool uses. The key is write-only; the backend only says whether one is saved. */
+const SEARCH_PROVIDERS = [
+  ['duckduckgo', 'DuckDuckGo', 'Works straight away, no key needed'],
+  ['brave', 'Brave Search', 'Needs an API key from brave.com/search/api'],
+  ['tavily', 'Tavily', 'Needs an API key from tavily.com'],
+];
+let searchDraft = null;
+function renderSearchSettings(content, actions) {
+  $('#settingsTitle').textContent = 'Web search';
+  if (!S.settings) {
+    content.append(el('p', { class: 'sub', style: 'color:var(--faint)' }, 'Loading…'));
+    api.settings.get().then(v => { S.settings = v; }, e => { S.settings = { error: e.message }; }).finally(() => { if (editing === 'search') renderSettings(); });
+    return;
+  }
+  if (S.settings.error) {
+    content.append(el('div', { class: 'p-err', style: 'margin:0;max-width:520px' }, S.settings.error));
+    actions.append(el('button', { class: 'btn', onclick: () => { S.settings = null; renderSettings(); } }, 'Try again'));
+    return;
+  }
+  const st = S.settings, pick = searchDraft || st.searchProvider || 'duckduckgo', needsKey = pick !== 'duckduckgo', name = SEARCH_PROVIDERS.find(x => x[0] === pick)?.[1] || pick;
+  const choices = el('div', { class: 'choices', role: 'radiogroup', 'aria-label': 'Search provider' }, ...SEARCH_PROVIDERS.map(([id, label, sub]) =>
+    el('button', { class: 'opt', type: 'button', role: 'radio', 'aria-checked': String(pick === id), 'data-sp': id, onclick: () => { searchDraft = id; renderSettings(); $(`#settingsContent [data-sp="${id}"]`).focus(); } },
+      svg(icon.mark, 'mark'), el('span', {}, el('b', {}, label), el('span', { class: 'd' }, sub)))));
+  content.append(el('div', { class: 'field' }, el('label', {}, 'Search provider'), el('p', { class: 'sub' }, 'Used when the model searches the web. Turn web search on or off per message from Tools in the composer.'), choices));
+  if (needsKey) {
+    const switched = st.hasSearchKey && pick !== st.searchProvider;
+    content.append(el('div', { class: 'field' }, el('label', { for: 'searchKey' }, `${name} API key`),
+      el('p', { class: 'sub' }, switched ? `The saved key was entered for another provider. Enter the ${name} key to replace it.` : st.hasSearchKey ? 'A key is saved. Leave blank to keep it.' : 'Stored only in the backend database. It is never shown again.'),
+      el('input', { class: 'input', id: 'searchKey', type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: st.hasSearchKey && !switched ? '••••••••••••' : 'Paste the key' })));
+  }
+  actions.append(el('button', { class: 'btn primary', onclick: saveSearch }, 'Save changes'));
+  if (st.hasSearchKey) actions.append(el('button', { class: 'btn danger', style: 'margin-left:auto', onclick: async () => { S.settings = await api.settings.update({ searchKey: '' }); renderSettings(); toast('Removed the saved key'); } }, 'Remove saved key'));
+}
+async function saveSearch() {
+  const pick = searchDraft || S.settings.searchProvider, key = $('#searchKey') ? $('#searchKey').value.trim() : '';
+  if (pick !== 'duckduckgo' && !key && !S.settings.hasSearchKey) { toast('Add an API key first, or choose DuckDuckGo'); $('#searchKey').focus(); return; }
+  const patch = { searchProvider: pick }; if (key) patch.searchKey = key;
+  S.settings = await api.settings.update(patch); searchDraft = null; renderSettings(); toast('Saved changes');
+}
+
 async function saveProvider() {
   const name = $('#pvName').value.trim(), baseUrl = $('#pvUrl').value.trim().replace(/\/+$/, ''), key = $('#pvKey').value;
   if (!name || !baseUrl) { toast('Add a name and a base URL first'); return; }
   if (!/^https?:\/\//.test(baseUrl)) { toast('The base URL needs to start with http:// or https://'); return; }
   const data = { name, baseUrl }; if (key) data.apiKey = key;
   let p;
-  if (editing && editing !== 'appearance') { p = await api.providers.update(editing, data); delete S.models[p.id]; toast('Saved changes'); }
+  if (editing && !APP_PAGES.includes(editing)) { p = await api.providers.update(editing, data); delete S.models[p.id]; toast('Saved changes'); }
   else { p = await api.providers.create(data); toast(`Added ${p.name}`); }
   S.providers = await api.providers.list(); editing = p.id; renderSettings(); await loadModels(p.id, true);
   if (!S.sel.model && S.models[p.id]?.length) { S.sel = { providerId: p.id, model: S.models[p.id][0].id }; renderPill(); renderThread(); }
@@ -849,7 +1485,7 @@ async function removeProvider(p) {
 
 /* ---------- overlays ---------- */
 function show(sel) { hideAll(true); $(sel).classList.add('show'); $('#scrim').classList.add('show'); }
-function hideAll(keepScrim) { ['#palette', '#chatPanel', '#settings'].forEach(s => $(s).classList.remove('show')); if (!keepScrim) $('#scrim').classList.remove('show'); hideMenu(); }
+function hideAll(keepScrim) { ['#palette', '#chatPanel', '#settings'].forEach(s => $(s).classList.remove('show')); if (!keepScrim) $('#scrim').classList.remove('show'); hideMenu(); closePop(); }
 $('#scrim').onclick = () => { hideAll(); closeMobile(); };
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => hideAll());
 
@@ -870,10 +1506,12 @@ function toast(msg, action, fn) {
   setTimeout(kill, action ? 5000 : 2600);
 }
 function confirmBox(title, text, okLabel, ok) {
+  const back = document.activeElement;
   const scr = el('div', { class: 'scrim show', style: 'z-index:79' });
   const box = el('div', { class: 'confirm', role: 'alertdialog' }, el('h3', {}, title), el('p', {}, text),
     el('div', { class: 'row' }, el('button', { class: 'btn', onclick: () => close() }, 'Cancel'), el('button', { class: 'btn primary', style: 'background:var(--danger);border-color:var(--danger)', onclick: () => { close(); ok(); } }, okLabel)));
-  const close = () => { scr.remove(); box.remove(); };
+  const close = () => { scr.remove(); box.remove(); if (back && back.isConnected) back.focus(); };
+  box.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
   scr.onclick = close; document.body.append(scr, box); box.querySelector('.primary').focus();
 }
 
@@ -885,9 +1523,30 @@ function toggleSidebar() {
 }
 function closeMobile() { if ($('#app').classList.contains('mobile-open')) { $('#app').classList.remove('mobile-open'); $('#scrim').classList.remove('show'); } }
 $('#toggleSidebar').onclick = toggleSidebar;
+/* Mode (system / light / dark) and colour scheme are separate choices. Both are attributes on <html>;
+   the token blocks at the top of the stylesheet do the rest. The inline script in <head> applies them before first paint. */
+const SCHEMES = [
+  ['klean', 'Klean', 'Cool grey with a blue accent'],
+  ['graphite', 'Graphite', 'Neutral greys, ink for an accent'],
+  ['paper', 'Paper', 'Warm paper and amber'],
+  ['moss', 'Moss', 'Soft sage with a forest green accent'],
+  ['contrast', 'Contrast', 'Black and white, strong borders'],
+];
 function currentThemePref() { try { return localStorage.getItem('sb:theme') || 'system'; } catch { return 'system'; } }
-function applyTheme() { const p = currentThemePref(); const dark = p === 'dark' || (p === 'system' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; }
+function currentScheme() { let v = null; try { v = localStorage.getItem('sb:scheme'); } catch {} return SCHEMES.some(x => x[0] === v) ? v : 'klean'; }
+function applyTheme() {
+  const p = currentThemePref(), root = document.documentElement;
+  const dark = p === 'dark' || (p === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  root.dataset.theme = dark ? 'dark' : 'light'; root.dataset.scheme = currentScheme();
+  // the tab icon and browser chrome follow the scheme
+  const cs = getComputedStyle(root), ink = cs.getPropertyValue('--ink').trim(), bg = cs.getPropertyValue('--bg').trim();
+  if (/^#[0-9a-f]{3,8}$/i.test(ink) && /^#[0-9a-f]{3,8}$/i.test(bg)) {
+    $('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'><rect width='22' height='22' rx='7' fill='${ink}'/><rect x='5' y='7' width='8' height='2' rx='1' fill='${bg}'/><rect x='9' y='13' width='8' height='2' rx='1' fill='${bg}'/></svg>`);
+    $('#themeColor').content = bg;
+  }
+}
 function setTheme(v) { try { localStorage.setItem('sb:theme', v); } catch {} applyTheme(); }
+function setScheme(v) { try { localStorage.setItem('sb:scheme', v); } catch {} applyTheme(); }
 $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 applyTheme();
@@ -900,7 +1559,9 @@ document.addEventListener('keydown', e => {
   else if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleSidebar(); }
   else if (e.key === 'Escape') {
     if (document.querySelector('.confirm')) return;
-    if (document.querySelector('.scrim.show')) { hideAll(); closeMobile(); }
+    if (popAnchor) closePop(true);
+    else if (document.querySelector('.scrim.show')) { hideAll(); closeMobile(); }
+    else if (S.art.open && ($('#artPane').contains(document.activeElement) || artOverlays() || !S.streaming)) closeArt(true);
     else if (S.streaming) S.streaming.abort();
   }
   else if (!mod && e.key.length === 1 && document.activeElement === document.body) input.focus();

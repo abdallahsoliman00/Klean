@@ -3,13 +3,13 @@
 - [] Save the settings to the database as well.
 - [x] Make an executable that can be distributed.
 - [] Make the chat name be a summary of the chat, not the message that was sent.
-- [] Add tool calls to create artifacts and code snippets. Ideas:
+- [x] Add tool calls to create artifacts and code snippets. Ideas:
     - Code snippets in the sidebar
     - Artifacts
     - Ask questions
     - Web search
 - [] Make code syntax highlighting work even in the chat box.
-- [] Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available.
+- [x] Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available. (Five schemes, each light and dark, in Settings → Appearance.)
 - [] Give the user the option to select from different code coloschemes as well.
 - [] Favourite chats.
 - [] Settings don't take effect and system prompts get deleted.

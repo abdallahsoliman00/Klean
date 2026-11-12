@@ -1,17 +1,14 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
 	"klean/backend/internal/llm"
-	"klean/backend/internal/prompt"
 	"klean/backend/internal/store"
+	"klean/backend/internal/tools"
 )
 
 // opt records whether a JSON field was present and whether it was null,
@@ -178,11 +175,25 @@ func (s *Server) createChat(w http.ResponseWriter, r *http.Request) {
 	reply(w, http.StatusCreated, c, err)
 }
 
+// chatDetail is a chat as the thread view loads it. "artifacts" is always
+// present, as [] when there are none.
+type chatDetail struct {
+	*store.ChatWithMessages
+	Artifacts []*store.Artifact `json:"artifacts"`
+}
+
 func (s *Server) getChat(w http.ResponseWriter, r *http.Request) {
-	c, err := s.db.GetChatWithMessages(r.PathValue("id"))
-	if err == nil && c == nil {
-		err = orNotFound(nil, "Chat not found.")
-	}
+	c, err := func() (*chatDetail, error) {
+		c, err := s.db.GetChatWithMessages(r.PathValue("id"))
+		if err != nil || c == nil {
+			return nil, orNotFound(err, "Chat not found.")
+		}
+		artifacts, err := s.db.Artifacts(c.ID)
+		if err != nil {
+			return nil, err
+		}
+		return &chatDetail{c, artifacts}, nil
+	}()
 	reply(w, 200, c, err)
 }
 
@@ -249,156 +260,78 @@ func (s *Server) restoreChat(w http.ResponseWriter, r *http.Request) {
 	reply(w, 200, c, err)
 }
 
-// ---------------- sending ----------------
+// ---------------- artifacts ----------------
 
-type sendBody struct {
-	Content       string `json:"content"`
-	ProviderID    string `json:"providerId"`
-	Model         string `json:"model"`
-	EditMessageID string `json:"editMessageId"`
-	Regenerate    bool   `json:"regenerate"`
+func (s *Server) deleteArtifact(w http.ResponseWriter, r *http.Request) {
+	found, err := s.db.DeleteArtifact(r.PathValue("id"))
+	if err == nil && !found {
+		err = orNotFound(nil, "Artifact not found.")
+	}
+	reply(w, http.StatusNoContent, nil, err)
 }
 
-// prepared is everything needed to stream a reply once the request checks out.
-type prepared struct {
-	req     llm.Request
-	userMsg *store.Message // nil when regenerating
-	title   *string        // set when this message named the chat
+// ---------------- settings ----------------
+
+const (
+	settingSearchProvider = "search_provider"
+	settingSearchKey      = "search_key"
+)
+
+// settings is what the browser sees. The search key itself never leaves the server.
+type settings struct {
+	SearchProvider string `json:"searchProvider"`
+	HasSearchKey   bool   `json:"hasSearchKey"`
 }
 
-func (s *Server) prepareSend(chatID string, body sendBody) (*prepared, error) {
-	if body.ProviderID == "" || body.Model == "" {
-		return nil, errorf(http.StatusUnprocessableEntity, "providerId and model are required.")
+// searchSettings returns the chosen search provider (DuckDuckGo unless
+// another was saved) and its key.
+func (s *Server) searchSettings() (provider, key string, err error) {
+	if provider, err = s.db.Setting(settingSearchProvider); err != nil {
+		return "", "", err
 	}
-	chat, err := s.db.GetChat(chatID)
-	if err != nil || chat == nil {
-		return nil, orNotFound(err, "Chat not found.")
+	if !tools.ValidSearchProvider(provider) {
+		provider = tools.DuckDuckGo
 	}
-	provider, err := s.db.GetProvider(body.ProviderID)
+	key, err = s.db.Setting(settingSearchKey)
+	return provider, key, err
+}
+
+func (s *Server) readSettings() (*settings, error) {
+	provider, key, err := s.searchSettings()
 	if err != nil {
 		return nil, err
 	}
-	if provider == nil {
-		return nil, errorf(http.StatusBadRequest, "That provider no longer exists. Pick another model.")
-	}
-	content := strings.TrimSpace(body.Content)
-	if !body.Regenerate && content == "" {
-		return nil, errorf(http.StatusUnprocessableEntity, "Message is empty.")
-	}
-
-	if body.EditMessageID != "" {
-		found, err := s.db.TruncateFrom(chatID, body.EditMessageID)
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			return nil, errorf(http.StatusNotFound, "The message being edited was not found.")
-		}
-	}
-	if body.Regenerate {
-		if err := s.db.DropTrailingAssistant(chatID); err != nil {
-			return nil, err
-		}
-	}
-
-	out := &prepared{}
-	if !body.Regenerate {
-		if out.userMsg, err = s.db.AddMessage(chatID, "user", content, "", false); err != nil {
-			return nil, err
-		}
-	}
-	pid, model := &body.ProviderID, &body.Model
-	patch := store.ChatPatch{ProviderID: &pid, Model: &model}
-	if chat.Title == "New chat" && out.userMsg != nil {
-		t := prompt.MakeTitle(out.userMsg.Content)
-		out.title, patch.Title = &t, &t
-	}
-	if chat, err = s.db.UpdateChat(chatID, patch, true); err != nil {
-		return nil, err
-	}
-
-	history, err := s.db.Messages(chatID)
-	if err != nil {
-		return nil, err
-	}
-	if len(history) == 0 || history[len(history)-1].Role != "user" {
-		return nil, errorf(http.StatusConflict, "There's no message to answer.")
-	}
-	turns := make([]prompt.Turn, len(history))
-	for i, m := range history {
-		turns[i] = prompt.Turn{Role: m.Role, Content: m.Content}
-	}
-	out.req = llm.Request{
-		BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: body.Model,
-		Instructions: chat.SystemPrompt,
-		Turns:        prompt.Build(chat.SystemPrompt, turns, chat.ContextWindow),
-		Temperature:  chat.Temperature,
-	}
-	return out, nil
+	return &settings{SearchProvider: provider, HasSearchKey: key != ""}, nil
 }
 
-// sendMessage streams Server-Sent Events: `user` (the saved user message),
-// `token` ({delta}), then `done` ({message, title}) or `error` ({message}).
-// Closing the connection stops generation; the partial reply is saved as stopped.
-func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
-	chatID := r.PathValue("id")
-	var body sendBody
-	if err := decode(r, &body); err != nil {
-		reply(w, 0, nil, err)
-		return
-	}
-	prep, err := s.prepareSend(chatID, body)
-	if err != nil {
-		reply(w, 0, nil, err)
-		return
-	}
+func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
+	out, err := s.readSettings()
+	reply(w, 200, out, err)
+}
 
-	h := w.Header()
-	h.Set("Content-Type", "text/event-stream")
-	h.Set("Cache-Control", "no-cache")
-	h.Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
-	rc := http.NewResponseController(w)
-	send := func(event string, data any) {
-		var buf bytes.Buffer
-		enc := json.NewEncoder(&buf)
-		enc.SetEscapeHTML(false)
-		_ = enc.Encode(data)
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, bytes.TrimSpace(buf.Bytes()))
-		_ = rc.Flush()
+func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		SearchProvider opt[string] `json:"searchProvider"`
+		SearchKey      opt[string] `json:"searchKey"` // "" clears the key, omitted or null keeps it
 	}
-
-	if prep.userMsg != nil {
-		send("user", prep.userMsg)
-	}
-	var text strings.Builder
-	err = llm.StreamReply(r.Context(), prep.req, func(delta string) {
-		text.WriteString(delta)
-		send("token", map[string]string{"delta": delta})
-	})
-
-	if err == nil {
-		msg, dbErr := s.db.AddMessage(chatID, "assistant", text.String(), body.Model, false)
-		if dbErr != nil {
-			log.Printf("saving reply: %v", dbErr)
-			send("error", map[string]string{"message": "The reply couldn't be saved."})
-			return
+	out, err := func() (*settings, error) {
+		if err := decode(r, &body); err != nil {
+			return nil, err
 		}
-		send("done", map[string]any{"message": msg, "title": prep.title})
-		return
-	}
-
-	var ue *llm.UpstreamError
-	if errors.As(err, &ue) {
-		send("error", map[string]string{"message": ue.Msg})
-	} else if r.Context().Err() == nil {
-		log.Printf("streaming reply: %v", err)
-		send("error", map[string]string{"message": "Something went wrong while streaming the reply."})
-	}
-	// Stopped by the user, or failed partway: keep what arrived.
-	if text.Len() > 0 {
-		if _, dbErr := s.db.AddMessage(chatID, "assistant", text.String(), body.Model, true); dbErr != nil {
-			log.Printf("saving partial reply: %v", dbErr)
+		if p := body.SearchProvider.value(); p != nil {
+			if !tools.ValidSearchProvider(*p) {
+				return nil, errorf(http.StatusUnprocessableEntity, "searchProvider must be duckduckgo, brave or tavily.")
+			}
+			if err := s.db.SetSetting(settingSearchProvider, *p); err != nil {
+				return nil, err
+			}
 		}
-	}
+		if k := body.SearchKey.value(); k != nil {
+			if err := s.db.SetSetting(settingSearchKey, strings.TrimSpace(*k)); err != nil {
+				return nil, err
+			}
+		}
+		return s.readSettings()
+	}()
+	reply(w, 200, out, err)
 }

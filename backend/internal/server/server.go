@@ -13,17 +13,28 @@ import (
 	"unicode/utf8"
 
 	"klean/backend/internal/store"
+	"klean/backend/internal/tools"
 )
 
 type Server struct {
-	db *store.DB
+	db  *store.DB
+	web *tools.Web // web_search and fetch_page
 }
+
+// Option adjusts a Server; tests use it to keep the web tools off the internet.
+type Option func(*Server)
+
+// WithWeb replaces the web tools, for example with ones pointed at a stub.
+func WithWeb(w *tools.Web) Option { return func(s *Server) { s.web = w } }
 
 // New returns the HTTP handler. static holds the frontend (index.html at its
 // root), or is nil to serve only the API. corsOrigins is a comma-separated
 // list, or "*".
-func New(db *store.DB, static fs.FS, corsOrigins string) http.Handler {
-	s := &Server{db: db}
+func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Handler {
+	s := &Server{db: db, web: tools.NewWeb()}
+	for _, o := range opts {
+		o(s)
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +55,10 @@ func New(db *store.DB, static fs.FS, corsOrigins string) http.Handler {
 	mux.HandleFunc("DELETE /api/chats/{id}", s.deleteChat)
 	mux.HandleFunc("POST /api/chats/{id}/restore", s.restoreChat)
 	mux.HandleFunc("POST /api/chats/{id}/messages", s.sendMessage)
+
+	mux.HandleFunc("DELETE /api/artifacts/{id}", s.deleteArtifact)
+	mux.HandleFunc("GET /api/settings", s.getSettings)
+	mux.HandleFunc("PATCH /api/settings", s.updateSettings)
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "Not found.")
