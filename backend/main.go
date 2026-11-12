@@ -1,17 +1,17 @@
-// Switchboard: a local chat UI for OpenAI-compatible servers, in one executable.
+// Klean: a local chat UI for OpenAI-compatible servers, in one executable.
 //
-// Build from the repository root:  go build -o switchboard ./backend
+// Build from the repository root:  go build -o klean ./backend
 //
 // Settings (flags or environment variables):
 //
-//	--host / SWITCHBOARD_HOST          default 127.0.0.1
-//	--port / SWITCHBOARD_PORT          default 8787
-//	--db   / SWITCHBOARD_DB            default: per-user data folder (see store.DefaultPath)
-//	--frontend / SWITCHBOARD_FRONTEND  default: the UI built into the executable;
+//	--host / KLEAN_HOST          default 127.0.0.1
+//	--port / KLEAN_PORT          default 8787
+//	--db   / KLEAN_DB            default: per-user data folder (see store.DefaultPath)
+//	--frontend / KLEAN_FRONTEND  default: the UI built into the executable;
 //	                                   a folder serves that instead, "none" serves only the API
-//	--no-browser / SWITCHBOARD_NO_BROWSER=1  don't open the browser on start
+//	--no-browser / KLEAN_NO_BROWSER=1  don't open the browser on start
 //	--headless                         no browser and no terminal window (services, autostart)
-//	SWITCHBOARD_CORS                   default * (comma-separated origins)
+//	KLEAN_CORS                   default * (comma-separated origins)
 package main
 
 import (
@@ -29,10 +29,10 @@ import (
 	"syscall"
 	"time"
 
-	"switchboard/backend/internal/launch"
-	"switchboard/backend/internal/server"
-	"switchboard/backend/internal/store"
-	"switchboard/frontend"
+	"klean/backend/internal/launch"
+	"klean/backend/internal/server"
+	"klean/backend/internal/store"
+	"klean/frontend"
 )
 
 func env(key, fallback string) string {
@@ -56,22 +56,22 @@ func main() {
 }
 
 func run() error {
-	port, err := strconv.Atoi(env("SWITCHBOARD_PORT", "8787"))
+	port, err := strconv.Atoi(env("KLEAN_PORT", "8787"))
 	if err != nil {
-		return errors.New("SWITCHBOARD_PORT must be a number")
+		return errors.New("KLEAN_PORT must be a number")
 	}
-	defaultDB := os.Getenv("SWITCHBOARD_DB")
+	defaultDB := os.Getenv("KLEAN_DB")
 	if defaultDB == "" {
 		if defaultDB, err = store.DefaultPath(); err != nil {
 			return err
 		}
 	}
-	host := flag.String("host", env("SWITCHBOARD_HOST", "127.0.0.1"), "address to listen on")
+	host := flag.String("host", env("KLEAN_HOST", "127.0.0.1"), "address to listen on")
 	flag.IntVar(&port, "port", port, "port to listen on")
 	dbPath := flag.String("db", defaultDB, "SQLite database file")
-	frontendDir := flag.String("frontend", env("SWITCHBOARD_FRONTEND", ""),
+	frontendDir := flag.String("frontend", env("KLEAN_FRONTEND", ""),
 		`serve the UI from this folder instead of the built-in copy ("none" = API only)`)
-	noBrowser := flag.Bool("no-browser", env("SWITCHBOARD_NO_BROWSER", "") != "", "don't open the browser on start")
+	noBrowser := flag.Bool("no-browser", env("KLEAN_NO_BROWSER", "") != "", "don't open the browser on start")
 	headless := flag.Bool("headless", false, "don't open a browser or a terminal window (for services and autostart)")
 	flag.Parse()
 	*noBrowser = *noBrowser || *headless
@@ -98,11 +98,11 @@ func run() error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		// (The errno for "address in use" differs per OS, so ask the port instead.)
-		if !isSwitchboard(url) {
+		if !isKlean(url) {
 			return fmt.Errorf("can't listen on port %d (%v).\n  If another program uses it, start with --port to pick another one", port, err)
 		}
 		// Already running (perhaps in another window): just show it.
-		fmt.Printf("\n  Switchboard is already running at %s\n\n", url)
+		fmt.Printf("\n  Klean is already running at %s\n\n", url)
 		if static != nil && !*noBrowser {
 			_ = launch.OpenBrowser(url)
 		}
@@ -117,12 +117,12 @@ func run() error {
 	defer db.Close()
 
 	srv := &http.Server{
-		Handler:           server.New(db, static, env("SWITCHBOARD_CORS", "*")),
+		Handler:           server.New(db, static, env("KLEAN_CORS", "*")),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	fmt.Printf("\n  Switchboard is running at %s\n  Database: %s\n", url, *dbPath)
+	fmt.Printf("\n  Klean is running at %s\n  Database: %s\n", url, *dbPath)
 	if launch.OwnsWindow() {
-		fmt.Print("\n  Closing this window stops Switchboard.\n\n")
+		fmt.Print("\n  Closing this window stops Klean.\n\n")
 	} else {
 		fmt.Print("\n  Press Ctrl+C to stop.\n\n")
 	}
@@ -158,8 +158,8 @@ func hasFlag(name string) bool {
 	return false
 }
 
-// isSwitchboard reports whether a Switchboard server answers at url.
-func isSwitchboard(url string) bool {
+// isKlean reports whether a Klean server answers at url.
+func isKlean(url string) bool {
 	client := http.Client{Timeout: 2 * time.Second}
 	res, err := client.Get(url + "api/health")
 	if err != nil {
@@ -167,5 +167,5 @@ func isSwitchboard(url string) bool {
 	}
 	defer res.Body.Close()
 	var body struct{ App string }
-	return json.NewDecoder(res.Body).Decode(&body) == nil && body.App == "switchboard"
+	return json.NewDecoder(res.Body).Decode(&body) == nil && body.App == "klean"
 }

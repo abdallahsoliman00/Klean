@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"switchboard/backend/internal/fakeprovider"
-	"switchboard/backend/internal/server"
-	"switchboard/backend/internal/store"
-	"switchboard/frontend"
+	"klean/backend/internal/fakeprovider"
+	"klean/backend/internal/server"
+	"klean/backend/internal/store"
+	"klean/frontend"
 )
 
 type env struct {
@@ -469,7 +469,7 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	defer srv.Close()
 	for path, want := range map[string]string{
 		"/":                        `src="js/api.js"`,
-		"/js/api.js":               "SwitchboardAPI",
+		"/js/api.js":               "KleanAPI",
 		"/vendor/highlight.min.js": "hljs",
 	} {
 		res, err := http.Get(srv.URL + path)
@@ -486,7 +486,7 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	res, _ := http.Get(srv.URL + "/api/health")
 	_ = json.NewDecoder(res.Body).Decode(&health)
 	res.Body.Close()
-	if health["app"] != "switchboard" {
+	if health["app"] != "klean" {
 		t.Errorf("health: %v", health)
 	}
 }

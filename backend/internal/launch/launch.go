@@ -1,4 +1,4 @@
-// Package launch handles how Switchboard starts on the desktop: giving it a
+// Package launch handles how Klean starts on the desktop: giving it a
 // terminal window when it was double-clicked, and opening the browser.
 //
 // The terminal window is the app's lifetime: closing it stops the server
@@ -16,7 +16,7 @@ import (
 
 // envInTerminal marks the copy of the program started inside a new terminal
 // window, so it doesn't try to open another one.
-const envInTerminal = "SWITCHBOARD_IN_TERMINAL"
+const envInTerminal = "KLEAN_IN_TERMINAL"
 
 // OpenBrowser opens url in the default browser without waiting for it.
 func OpenBrowser(url string) error {

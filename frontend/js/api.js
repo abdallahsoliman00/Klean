@@ -1,9 +1,9 @@
-/* Switchboard API client — the only file in the frontend that knows about the backend.
-   Point it at another backend by setting window.SWITCHBOARD_API = "http://host:port" before this script. */
+/* Klean API client — the only file in the frontend that knows about the backend.
+   Point it at another backend by setting window.KLEAN_API = "http://host:port" before this script. */
 (() => {
-  const ROOT = (window.SWITCHBOARD_API || "").replace(/\/+$/, "") + "/api";
+  const ROOT = (window.KLEAN_API || "").replace(/\/+$/, "") + "/api";
   const OFFLINE =
-    "Can't reach the Switchboard backend. Check that it's running.";
+    "Can't reach the Klean backend. Check that it's running.";
 
   async function req(method, path, body) {
     let res;
@@ -95,7 +95,7 @@
     return result;
   }
 
-  window.SwitchboardAPI = {
+  window.KleanAPI = {
     providers: {
       list: () => req("GET", "/providers"),
       create: (data) => req("POST", "/providers", data),

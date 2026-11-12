@@ -1,4 +1,4 @@
-- [] Change the name to something more interesting than switchboard.
+- [x] Change the name to something more interesting than switchboard. (Now Klean.)
 - [] Make the context window larger than 128k tokens.
 - [] Save the settings to the database as well.
 - [x] Make an executable that can be distributed.

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"switchboard/backend/internal/store"
+	"klean/backend/internal/store"
 )
 
 type Server struct {
@@ -28,7 +28,7 @@ func New(db *store.DB, static fs.FS, corsOrigins string) http.Handler {
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		// "app" lets a second copy recognise one that is already running.
-		writeJSON(w, 200, map[string]any{"ok": true, "app": "switchboard"})
+		writeJSON(w, 200, map[string]any{"ok": true, "app": "klean"})
 	})
 
 	mux.HandleFunc("GET /api/providers", s.listProviders)

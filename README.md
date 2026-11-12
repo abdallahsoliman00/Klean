@@ -1,4 +1,4 @@
-# Switchboard
+# Klean
 
 A local chat UI for any OpenAI-compatible server (Ollama, LM Studio, vLLM, llama.cpp, OpenRouter, OpenAI…).
 It ships as **one executable** with the UI built in: copy it anywhere, double-click it, and it opens
@@ -6,7 +6,7 @@ in your browser. The backend owns the chats, context and provider keys (SQLite);
 the frontend is static files that only talk to the backend's `/api`.
 
 ```
-switchboard/
+klean/
 ├── go.mod                    one Go module for the whole repo (so the UI can be embedded)
 ├── backend/                  Go — API, SQLite, calls to providers
 │   ├── main.go               flags and startup
@@ -40,8 +40,8 @@ Needs Go 1.26+ to build (https://go.dev/dl/).
 run.bat
 ```
 
-Both build `./switchboard` (dependencies are downloaded the first time), start it, and open
-**http://localhost:8787** in your browser. Manual equivalent: `go build -o switchboard ./backend && ./switchboard`
+Both build `./klean` (dependencies are downloaded the first time), start it, and open
+**http://localhost:8787** in your browser. Manual equivalent: `go build -o klean ./backend && ./klean`
 
 ### Build for distribution
 
@@ -57,7 +57,7 @@ is pure Go, so there's no cgo.
 
 - **The browser opens** at the app's address. Use `--no-browser` to skip that.
 - **Double-clicked in a file manager**, it opens its own terminal window showing the address and
-  where the database is. **Closing that window stops Switchboard** and frees the port. On Windows,
+  where the database is. **Closing that window stops Klean** and frees the port. On Windows,
   Explorer gives it a console window. On macOS, Finder opens it in Terminal. On Linux, it finds your
   desktop's terminal: `$TERMINAL`, `xdg-terminal-exec`, Konsole, Ptyxis, GNOME Terminal and others.
 - **Started from a terminal**, it stays in that terminal; Ctrl+C stops it.
@@ -96,15 +96,15 @@ API keys are kept in the SQLite database and never sent to the browser.
 
 | Flag           | Environment variable    | Default                     |
 |----------------|-------------------------|-----------------------------|
-| `--port`       | `SWITCHBOARD_PORT`      | `8787`                      |
-| `--host`       | `SWITCHBOARD_HOST`      | `127.0.0.1` (this computer only) |
-| `--db`         | `SWITCHBOARD_DB`        | per-user data folder, below |
-| `--frontend`   | `SWITCHBOARD_FRONTEND`  | the built-in UI; a folder path serves that instead, `none` = API only |
-| `--no-browser` | `SWITCHBOARD_NO_BROWSER=1` | off                      |
+| `--port`       | `KLEAN_PORT`      | `8787`                      |
+| `--host`       | `KLEAN_HOST`      | `127.0.0.1` (this computer only) |
+| `--db`         | `KLEAN_DB`        | per-user data folder, below |
+| `--frontend`   | `KLEAN_FRONTEND`  | the built-in UI; a folder path serves that instead, `none` = API only |
+| `--no-browser` | `KLEAN_NO_BROWSER=1` | off                      |
 | `--headless`   |                         | off (no browser, no terminal window) |
-|                | `SWITCHBOARD_CORS`      | `*`                         |
+|                | `KLEAN_CORS`      | `*`                         |
 
-Example: `./switchboard --port 9000 --db ~/chats.db`
+Example: `./klean --port 9000 --db ~/chats.db`
 
 ### Where chats are stored
 
@@ -113,12 +113,11 @@ moved, renamed or replaced without losing anything:
 
 | OS      | Default database |
 |---------|------------------|
-| Linux   | `~/.local/share/switchboard/switchboard.db` (or `$XDG_DATA_HOME/switchboard/`) |
-| macOS   | `~/Library/Application Support/Switchboard/switchboard.db` |
-| Windows | `%LOCALAPPDATA%\Switchboard\switchboard.db` |
+| Linux   | `~/.local/share/klean/klean.db` (or `$XDG_DATA_HOME/klean/`) |
+| macOS   | `~/Library/Application Support/Klean/klean.db` |
+| Windows | `%LOCALAPPDATA%\Klean\klean.db` |
 
-`--db` or `SWITCHBOARD_DB` puts it anywhere else. To move chats from an older version, copy its
-`backend/data/switchboard.db` to the path above while Switchboard is stopped.
+`--db` or `KLEAN_DB` puts it anywhere else.
 
 ### Working on the UI
 
@@ -131,7 +130,7 @@ The backend serves the frontend by default. To host the UI elsewhere (another po
 start the backend with `--frontend none` and set the backend address before `js/api.js` loads:
 
 ```html
-<script>window.SWITCHBOARD_API = "http://localhost:8787";</script>
+<script>window.KLEAN_API = "http://localhost:8787";</script>
 <script src="js/api.js"></script>
 ```
 

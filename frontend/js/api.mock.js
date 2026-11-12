@@ -91,4 +91,4 @@ const MockAPI = (() => {
     },
   };
 })();
-window.SwitchboardAPI = MockAPI;
+window.KleanAPI = MockAPI;

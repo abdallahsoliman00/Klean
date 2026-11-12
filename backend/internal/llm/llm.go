@@ -19,7 +19,7 @@ import (
 	"github.com/openai/openai-go/v3/packages/ssestream"
 	"github.com/openai/openai-go/v3/responses"
 
-	"switchboard/backend/internal/prompt"
+	"klean/backend/internal/prompt"
 )
 
 const (
