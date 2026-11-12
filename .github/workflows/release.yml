@@ -1,0 +1,153 @@
+name: release
+
+# Builds every supported target and publishes one archive per target on GitHub
+# Releases. Trigger it by pushing a tag:
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# The frontend is embedded in the binary, so each archive holds a single
+# self-contained executable plus the README.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v1.0.0). Re-runs replace the release's files."
+        required: true
+
+permissions:
+  contents: write
+
+# One publish per ref at a time; never cancel a half-finished upload.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Accept either "1.2.3" (from a tag) or "v1.2.3".
+  VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64, ext: "",     format: tar.gz }
+          - { goos: linux,   goarch: arm64, ext: "",     format: tar.gz }
+          - { goos: darwin,  goarch: amd64, ext: "",     format: tar.gz }
+          - { goos: darwin,  goarch: arm64, ext: "",     format: tar.gz }
+          - { goos: windows, goarch: amd64, ext: ".exe", format: zip }
+          - { goos: windows, goarch: arm64, ext: ".exe", format: zip }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build and package
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          EXT: ${{ matrix.ext }}
+          FORMAT: ${{ matrix.format }}
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          name="klean_${version}_${GOOS}_${GOARCH}"
+          archive="dist/${name}.${FORMAT}"
+
+          # Stage the layout we ship: <name>/klean[.exe] + README.md
+          stage="dist/${name}"
+          mkdir -p "$stage"
+
+          echo "building ${name}/klean${EXT}"
+          CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+            go build -trimpath -ldflags "-s -w" -o "${stage}/klean${EXT}" ./backend
+
+          cp README.md "$stage/"
+
+          # Windows gets a .zip, everything else a .tar.gz holding the same tree.
+          if [ "$FORMAT" = "zip" ]; then
+            (cd dist && zip -9 -r -X "${name}.zip" "${name}")
+          else
+            tar -czf "$archive" -C dist "$name"
+          fi
+
+          (cd dist && sha256sum "${name}.${FORMAT}" > "${name}.${FORMAT}.sha256")
+
+          ls -lh "$archive"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: klean_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: |
+            dist/*.${{ matrix.format }}
+            dist/*.${{ matrix.format }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Collect checksums
+        run: |
+          set -euo pipefail
+          cd artifacts
+          ls -1
+          # One combined file next to the per-archive .sha256 files.
+          cat ./*.sha256 | sort -k2 | tee "checksums.txt"
+          # Strip the per-archive files so only the combined list is published.
+          rm -f ./*.sha256
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="$VERSION"
+          title="Klean ${tag}"
+          files=(artifacts/*.tar.gz artifacts/*.zip artifacts/checksums.txt)
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release $tag exists, uploading assets"
+            gh release upload "$tag" "${files[@]}" --clobber
+          else
+            gh release create "$tag" "${files[@]}" \
+              --title "$title" \
+              --generate-notes \
+              --verify-tag
+          fi
