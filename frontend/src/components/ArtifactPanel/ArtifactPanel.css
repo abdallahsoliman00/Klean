@@ -1,0 +1,36 @@
+/* Artifact panel */
+/* ---------- artifact panel ---------- */
+.art{grid-column:3;min-width:0;overflow:hidden;background:var(--bg);border-left:1px solid var(--line);visibility:hidden;transition:visibility 0s .32s}
+.app.art-open .art{visibility:visible;transition-delay:0s}
+.art-inner{width:var(--art);height:100%;display:flex;flex-direction:column}
+.art-head{display:flex;align-items:center;gap:6px;height:56px;padding:10px 10px 10px 12px;flex-shrink:0}
+.art-switch{display:flex;align-items:center;gap:10px;min-width:0;padding:5px 10px 5px 5px;border-radius:10px;font-weight:600;font-size:15px;letter-spacing:-.01em;transition:background .12s}
+.art-switch:hover,.art-switch[aria-expanded="true"]{background:var(--line-soft)}
+.art-switch .glyph{width:28px;height:28px;border-radius:7px}
+.art-switch .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.art-switch .count{font-weight:400;font-size:12.5px;color:var(--faint);white-space:nowrap}
+.art-switch>svg{flex-shrink:0;color:var(--faint)}
+.art-head .spacer,.art-bar .spacer{flex:1}
+.art-bar{display:flex;align-items:center;gap:4px;padding:0 10px 10px 12px;flex-shrink:0;min-height:44px}
+.art-bar .a-meta{margin-left:6px}
+.art-bar .seg+.a-meta{margin-left:12px}
+.seg.small button{padding:4px 12px;font-size:13px}
+.icon-btn.done{color:var(--ok)}
+.icon-btn.danger:hover{color:var(--danger)}
+.art-view{flex:1;min-height:0;margin:0 12px 12px;border-radius:14px;border:1px solid var(--line);background:var(--raised);overflow:hidden;display:flex;flex-direction:column}
+.art-view iframe{flex:1;width:100%;border:0;background:#fff;display:block}
+.art-scroll{flex:1;overflow:auto;scrollbar-width:thin}
+.art-scroll.code{background:var(--code-bg)}
+.art-doc{padding:28px 32px 40px;max-width:720px;margin:0 auto}
+.art-code{margin:0;padding:16px 18px 28px;font-family:var(--mono);font-size:12.5px;line-height:1.65;width:max-content;min-width:100%;box-sizing:border-box;tab-size:2}
+.art-code code{font:inherit}
+.art-empty{margin:auto;padding:28px;text-align:center;color:var(--faint);line-height:1.5}
+@media (max-width:1100px){
+  /* not enough room for three columns: the artifact panel slides over the thread instead */
+  .art{position:fixed;z-index:39;top:0;right:0;bottom:0;width:min(600px,100vw);--art:min(600px,100vw);box-shadow:var(--shadow);transform:translateX(calc(100% + 64px));transition:transform .3s var(--ease),visibility 0s .3s}
+  .app.art-open .art{transform:none;transition:transform .3s var(--ease),visibility 0s}
+}
+@media (max-width:820px){
+  .art{width:100vw;--art:100vw;border-left:0}
+  .art-doc{padding:20px 18px 32px}
+}

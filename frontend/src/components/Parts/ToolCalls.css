@@ -1,0 +1,29 @@
+/* Tool call rows (search, page reads, errors) and search results */
+/* ---------- message parts: prose and tool calls in the order they happened ---------- */
+.parts>*+*{margin-top:12px}
+.parts>.trow+.trow,.parts>.trow+.tsearch,.parts>.tsearch+.trow,.parts>.tsearch+.tsearch{margin-top:2px}
+.parts>.thinking{margin-top:4px}
+.trow{font-family:var(--ui);font-size:13px;line-height:1.45;color:var(--muted);display:flex;align-items:center;gap:8px;min-height:28px;max-width:100%}
+.trow>svg{flex-shrink:0;color:var(--faint)}
+.trow .t-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .t-aside{color:var(--faint);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:2}
+.trow a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.trow a:hover{text-decoration-color:currentColor}
+.trow q{quotes:"“" "”";color:var(--ink)}
+.trow.err>svg{color:var(--danger)}
+.trow.err{align-items:flex-start;padding:4px 0}
+.trow.err>svg{margin-top:2px}
+.trow.err .t-text{white-space:normal}
+.trow.err b{font-weight:500;color:var(--ink)}
+button.trow{margin-left:-8px;padding:0 8px;border-radius:8px;text-align:left}
+button.trow:hover{background:var(--line-soft);color:var(--ink)}
+button.trow .chev{transition:transform .2s var(--ease)}
+button.trow[aria-expanded="true"] .chev{transform:rotate(90deg)}
+.results{list-style:none;margin:4px 0 6px 6px;padding:2px 0 2px 14px;border-left:1px solid var(--line);font-family:var(--ui);display:grid;gap:2px}
+.res{display:block;padding:7px 10px;border-radius:9px;color:inherit;text-decoration:none;max-width:560px}
+a.res:hover{background:var(--line-soft)}
+.res-top{display:flex;align-items:baseline;gap:10px}
+.res-t{font-size:13.5px;font-weight:500;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res-d{font-size:12px;color:var(--faint);white-space:nowrap}
+.res-s{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:2px}
+.trow .t-text.wrap{white-space:normal}

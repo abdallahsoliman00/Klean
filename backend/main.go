@@ -4,14 +4,14 @@
 //
 // Settings (flags or environment variables):
 //
-//	--host / KLEAN_HOST          default 127.0.0.1
-//	--port / KLEAN_PORT          default 8787
+//	--host / KLEAN_HOST          default config.DefaultHost
+//	--port / KLEAN_PORT          default config.DefaultPort
 //	--db   / KLEAN_DB            default: per-user data folder (see store.DefaultPath)
 //	--frontend / KLEAN_FRONTEND  default: the UI built into the executable;
 //	                                   a folder serves that instead, "none" serves only the API
 //	--no-browser / KLEAN_NO_BROWSER=1  don't open the browser on start
 //	--headless                         no browser and no terminal window (services, autostart)
-//	KLEAN_CORS                   default * (comma-separated origins)
+//	KLEAN_CORS                   default config.DefaultCORSOrigins (comma-separated origins)
 package main
 
 import (

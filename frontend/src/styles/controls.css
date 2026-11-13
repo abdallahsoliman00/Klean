@@ -1,0 +1,31 @@
+/* Shared controls: buttons, inputs, segmented controls, keys, switches, options */
+kbd{font-family:var(--ui);font-size:11px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 5px;background:transparent}
+.icon-btn{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:var(--muted);transition:background .12s,color .12s}
+.icon-btn:hover{background:var(--line-soft);color:var(--ink)}
+.input,.textarea{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--surface);outline:none;transition:border-color .15s,box-shadow .15s}
+.input:focus,.textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.textarea{resize:vertical;min-height:110px;line-height:1.5}
+.btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:9px;font-weight:500;border:1px solid var(--line);background:var(--raised);transition:background .12s,border-color .12s,transform .12s}
+.btn:hover{border-color:var(--faint)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.danger{color:var(--danger)}
+.btn.small{height:30px;padding:0 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{padding:6px 14px;border-radius:7px;color:var(--muted)}
+.seg button.on{background:var(--raised);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 1px var(--line)}
+.select{appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%238A929E' stroke-width='1.6'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E") no-repeat right 10px center;padding-right:30px}
+.field{margin-bottom:18px}
+.field label{display:block;font-weight:500;margin-bottom:6px}
+.field .sub{font-size:12.5px;color:var(--faint);margin:-2px 0 8px;line-height:1.45}
+/* radio / checkbox options (question card, settings choices) */
+.opt{display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;padding:9px 10px;border-radius:10px;line-height:1.4;transition:background .12s}
+.opt:hover{background:var(--line-soft)}
+.opt[aria-checked="true"]{background:var(--accent-soft)}
+.opt .mark{width:17px;height:17px;margin-top:1px;border-radius:50%;border:1.5px solid var(--faint);flex-shrink:0;display:grid;place-items:center;color:transparent;transition:background .12s,border-color .12s}
+.opt[role="checkbox"] .mark{border-radius:5px}
+.opt[aria-checked="true"] .mark{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.opt b{font-weight:500;display:block}
+.opt span.d{display:block;font-size:12.5px;color:var(--muted)}

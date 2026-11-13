@@ -1,9 +1,24 @@
-// Package frontend bundles the static UI into the executable.
+// Package frontend bundles the built UI into the executable.
+//
+// The UI source lives in src/ and is built with Vite into dist/
+// (npm ci && npm run build, in this folder) before go build.
 package frontend
 
-import "embed"
+import (
+	"embed"
+	"io/fs"
+)
 
-// Files holds index.html, js/ and vendor/, so the binary needs nothing beside it.
-//
-//go:embed index.html js vendor
-var Files embed.FS
+//go:embed all:dist
+var dist embed.FS
+
+// Files holds the built UI with index.html at its root, so the binary needs nothing beside it.
+var Files = mustSub(dist, "dist")
+
+func mustSub(f fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(f, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
+}

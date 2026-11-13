@@ -1,0 +1,10 @@
+/* Question card: the model asks, the user picks or types */
+/* question card */
+.ask{max-width:540px;background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:16px 16px 14px;font-family:var(--ui)}
+.ask-q{font-family:var(--prose);font-size:18px;line-height:1.4;margin:0 0 3px}
+.ask-how{font-size:12.5px;color:var(--faint);margin:0 0 10px}
+.opts{display:grid;gap:2px;margin:0 -6px 8px}
+.ask-foot{display:flex;gap:8px;align-items:center}
+.ask-foot .input{flex:1;min-width:0;height:36px;padding-top:0;padding-bottom:0}
+.asked{font-family:var(--ui);display:flex;flex-direction:column;gap:6px}
+.asked .bubble{align-self:flex-end}

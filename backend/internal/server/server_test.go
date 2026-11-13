@@ -476,20 +476,27 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	defer db.Close()
 	srv := httptest.NewServer(server.New(db, frontend.Files, "*"))
 	defer srv.Close()
-	for path, want := range map[string]string{
-		"/":                        `src="js/api.js"`,
-		"/js/api.js":               "KleanAPI",
-		"/vendor/highlight.min.js": "hljs",
-	} {
+	get := func(path string) string {
 		res, err := http.Get(srv.URL + path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		body, _ := io.ReadAll(res.Body)
 		res.Body.Close()
-		if res.StatusCode != 200 || !strings.Contains(string(body), want) {
-			t.Errorf("GET %s: %d, missing %q", path, res.StatusCode, want)
+		if res.StatusCode != 200 {
+			t.Fatalf("GET %s: %d", path, res.StatusCode)
 		}
+		return string(body)
+	}
+	index := get("/")
+	if !strings.Contains(index, `<div id="root">`) {
+		t.Fatalf("index.html has no React root:\n%s", index)
+	}
+	// Vite hashes asset names per build, so follow the script tag rather than hard-coding it.
+	_, after, ok := strings.Cut(index, `src="./assets/`)
+	script, _, _ := strings.Cut(after, `"`)
+	if !ok || !strings.HasSuffix(script, ".js") || get("/assets/"+script) == "" {
+		t.Errorf("bundle script %q not served", script)
 	}
 	var health map[string]any
 	res, _ := http.Get(srv.URL + "/api/health")

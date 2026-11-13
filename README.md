@@ -19,17 +19,23 @@ klean/
 │   │   ├── launch/           opens the browser, and a terminal window when double-clicked
 │   │   └── fakeprovider/     a fake OpenAI-compatible server for tests
 │   └── cmd/fakeprovider/     the same fake server as a program, for UI work
-└── frontend/                 static UI (no build step), embedded into the executable
-    ├── embed.go              tells Go which files to embed
-    ├── index.html
-    ├── js/api.js             the only file that talks to the backend
-    ├── js/api.mock.js        in-memory stand-in, for UI work without a backend
-    └── vendor/               markdown, sanitiser, highlighter, fonts (works offline)
+└── frontend/                 React + Vite + TypeScript UI, built into dist/ and embedded into the executable
+    ├── embed.go              embeds dist/ (index.html at its root)
+    ├── index.html            page shell and the pre-paint theme script
+    ├── vite.config.ts        build, dev server and /api proxy
+    └── src/
+        ├── config.ts         every timeout, size, limit, default, storage key and endpoint
+        ├── api/              the only code that talks to the backend (+ mock/ for UI work alone)
+        ├── store/            app state, one slice per concern (zustand)
+        ├── components/       one folder per area, each with its own CSS
+        ├── hooks/            small reusable behaviours (scrolling, autosize, shortcuts…)
+        ├── lib/              plain helpers: markdown, highlighting, tokens, theme…
+        └── styles/           design tokens, base styles, fonts (self-hosted, works offline)
 ```
 
 ## Run it
 
-Needs Go 1.26+ to build (https://go.dev/dl/).
+Needs Go 1.26+ (https://go.dev/dl/) and Node.js 24+ (https://nodejs.org/) to build.
 
 **macOS / Linux**
 ```bash
@@ -41,8 +47,9 @@ Needs Go 1.26+ to build (https://go.dev/dl/).
 run.bat
 ```
 
-Both build `./klean` (dependencies are downloaded the first time), start it, and open
-**http://localhost:8787** in your browser. Manual equivalent: `go build -o klean ./backend && ./klean`
+Both build the UI and `./klean` (dependencies are downloaded the first time), start it, and open
+**http://localhost:8787** in your browser. Manual equivalent:
+`(cd frontend && npm ci && npm run build) && go build -o klean ./backend && ./klean`
 
 ### Build for distribution
 
@@ -121,22 +128,33 @@ moved, renamed or replaced without losing anything:
 
 `--db` or `KLEAN_DB` puts it anywhere else.
 
-### Working on the UI
+## Frontend
 
-The executable serves the copy of `frontend/` it was built with. To see edits without rebuilding,
-serve the folder directly: `go run ./backend --frontend frontend`, then reload the page.
+The UI is React + TypeScript, built with Vite into `frontend/dist`, which `frontend/embed.go`
+embeds into the executable. Build it before any `go build`, `go vet` or `go test`:
 
-## Running the frontend separately
-
-The backend serves the frontend by default. To host the UI elsewhere (another port, a dev server),
-start the backend with `--frontend none` and set the backend address before `js/api.js` loads:
-
-```html
-<script>window.KLEAN_API = "http://localhost:8787";</script>
-<script src="js/api.js"></script>
+```bash
+cd frontend
+npm ci
+npm run build       # typecheck (tsgo), then vite build into dist/
 ```
 
-To work on the UI with no backend at all, load `js/api.mock.js` instead of `js/api.js`.
+Other scripts:
+
+| Script              | What it does |
+|---------------------|--------------|
+| `npm run dev`       | Vite dev server with hot reload; `/api` is proxied to the backend on http://localhost:8787 (start it with `go run ./backend --no-browser`) |
+| `npm run dev:mock`  | the same, with an in-memory mock backend instead (`src/api/mock`), for UI work with no backend at all |
+| `npm run typecheck` | `tsgo --noEmit` |
+| `npm run lint`      | `oxlint` |
+
+Tunable values (timeouts, sizes, limits, defaults, storage keys, endpoint paths) live in
+`frontend/src/config.ts`. Markdown, sanitising and highlighting come from the `marked`, `dompurify`
+and `highlight.js` packages; fonts are bundled from `src/assets/fonts`, so the app works offline.
+
+To serve a built copy without rebuilding the executable, point the backend at it:
+`go run ./backend --frontend frontend/dist`. To host the UI on another origin, start the backend
+with `--frontend none` and build with `VITE_KLEAN_API=http://localhost:8787 npm run build`.
 
 ## Tools
 
@@ -227,6 +245,7 @@ finished, is saved and marked as stopped.
 ## Tests
 
 ```bash
+(cd frontend && npm ci && npm run build)   # the Go packages embed the built UI
 go test ./...
 ```
 

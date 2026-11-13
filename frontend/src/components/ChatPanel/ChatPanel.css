@@ -1,0 +1,12 @@
+/* Chat settings side panel */
+/* side panel */
+.panel{position:fixed;z-index:45;top:0;right:0;bottom:0;width:min(380px,100vw);background:var(--raised);border-left:1px solid var(--line);box-shadow:var(--shadow);transform:translateX(calc(100% + 64px));transition:transform .3s var(--ease);display:flex;flex-direction:column}
+.panel.show{transform:none}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 12px 20px}
+.panel-head h2{font-size:15px;font-weight:600;margin:0}
+.panel-body{padding:4px 20px 20px;overflow-y:auto;flex:1}
+.range-row{display:flex;align-items:center;gap:12px}
+.range-row input{flex:1;accent-color:var(--accent)}
+.range-row output{width:34px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line-soft);color:var(--muted);font-variant-numeric:tabular-nums}
+.stat b{color:var(--ink);font-weight:500}

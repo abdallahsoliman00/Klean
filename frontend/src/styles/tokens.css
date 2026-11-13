@@ -1,0 +1,88 @@
+/* Colour schemes and design tokens */
+/* ---------- colour schemes ----------
+   Every scheme defines the full token set twice: light, then dark. The attributes can sit on any
+   element (the swatches in Settings use that), so the first pair also answers to [data-scheme="klean"]. */
+:root{
+  --ui:"Instrument Sans",system-ui,sans-serif; --prose:"Newsreader",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1); --sidebar:280px; --art:clamp(380px,40vw,680px);
+}
+:root,[data-scheme="klean"]{
+  --bg:#E9ECF0; --surface:#F7F8FA; --raised:#FFFFFF; --ink:#1A1F27; --muted:#5D6673; --faint:#7F8894;
+  --line:#D9DEE5; --line-soft:#E5E9EE; --accent:#2B59C3; --accent-hover:#244CA8; --accent-soft:#E2E9F8;
+  --accent-ink:#FFFFFF; --user:#E1E7F3; --danger:#B4372F; --danger-soft:#F7E3E1; --ok:#2F7D4F; --caret:#D9822B;
+  --code-bg:#EEF1F5; --shadow:0 12px 40px -12px rgba(26,31,39,.28), 0 2px 6px rgba(26,31,39,.06);
+  --t-key:#7A3EB8; --t-str:#2B7549; --t-num:#A55410; --t-com:#7F8894; --t-fn:#2B59C3;
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --bg:#07090B; --surface:#0F1216; --raised:#171B21; --ink:#E4E7EC; --muted:#979FAA; --faint:#6F7782;
+  --line:#262C35; --line-soft:#1A1F26; --accent:#6CA6F5; --accent-hover:#8DBBF8; --accent-soft:#15253B;
+  --accent-ink:#07111F; --user:#1B222C; --danger:#F08A80; --danger-soft:#33191A; --ok:#6CC594; --caret:#F0A75A;
+  --code-bg:#0A0C10; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#EE9488; --t-str:#8FD4A8; --t-num:#E9BD6B; --t-com:#6F7782; --t-fn:#8DB8F7;
+  color-scheme:dark;
+}
+[data-scheme="graphite"]{
+  --bg:#E6E6E6; --surface:#F4F4F4; --raised:#FFFFFF; --ink:#171717; --muted:#5A5A5A; --faint:#808080;
+  --line:#D4D4D4; --line-soft:#E4E4E4; --accent:#262626; --accent-hover:#000000; --accent-soft:#E2E2E2;
+  --accent-ink:#FFFFFF; --user:#E4E4E4; --danger:#A8332B; --danger-soft:#F5E2E0; --ok:#2F7D4F; --caret:#D9822B;
+  --code-bg:#ECECEC; --shadow:0 12px 40px -12px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.06);
+  --t-key:#171717; --t-str:#3F6149; --t-num:#84531C; --t-com:#808080; --t-fn:#34497A;
+  color-scheme:light;
+}
+[data-scheme="graphite"][data-theme="dark"]{
+  --bg:#070707; --surface:#101010; --raised:#191919; --ink:#EAEAEA; --muted:#A0A0A0; --faint:#737373;
+  --line:#2B2B2B; --line-soft:#1D1D1D; --accent:#EDEDED; --accent-hover:#FFFFFF; --accent-soft:#2A2A2A;
+  --accent-ink:#111111; --user:#222222; --danger:#F08A80; --danger-soft:#351C1C; --ok:#6CC594; --caret:#F0A75A;
+  --code-bg:#0A0A0A; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#F2F2F2; --t-str:#A5C4AE; --t-num:#D8B48A; --t-com:#737373; --t-fn:#A9BCDF;
+  color-scheme:dark;
+}
+[data-scheme="paper"]{
+  --bg:#E9E2D3; --surface:#F5F0E4; --raised:#FCF9F1; --ink:#2A2418; --muted:#665B48; --faint:#8A7D63;
+  --line:#DCD2BD; --line-soft:#E7DFCE; --accent:#8A4F00; --accent-hover:#6F3F00; --accent-soft:#F1E2BF;
+  --accent-ink:#FFFAF0; --user:#EBDFC4; --danger:#A93A26; --danger-soft:#F4DDD3; --ok:#4B7030; --caret:#C8811A;
+  --code-bg:#EFE8D8; --shadow:0 12px 40px -12px rgba(42,36,24,.3), 0 2px 6px rgba(42,36,24,.07);
+  --t-key:#9A3F2E; --t-str:#4F6927; --t-num:#1F6B74; --t-com:#8A7D63; --t-fn:#8A4F00;
+  color-scheme:light;
+}
+[data-scheme="paper"][data-theme="dark"]{
+  --bg:#0B0906; --surface:#15110B; --raised:#1E1911; --ink:#EDE4D0; --muted:#A99D85; --faint:#7C715C;
+  --line:#30291C; --line-soft:#231D13; --accent:#E5A84B; --accent-hover:#F0BC6C; --accent-soft:#33260F;
+  --accent-ink:#1A1203; --user:#29221A; --danger:#F0907F; --danger-soft:#381C16; --ok:#A3C37A; --caret:#F0A75A;
+  --code-bg:#100D08; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#EE9C84; --t-str:#B4CB85; --t-num:#7FC7C9; --t-com:#7C715C; --t-fn:#E9B866;
+  color-scheme:dark;
+}
+[data-scheme="moss"]{
+  --bg:#E3E8E1; --surface:#F3F6F1; --raised:#FCFDFB; --ink:#18211B; --muted:#56635A; --faint:#768378;
+  --line:#D3DCD2; --line-soft:#E2E8E0; --accent:#2A6B48; --accent-hover:#205739; --accent-soft:#DCEBDF;
+  --accent-ink:#FFFFFF; --user:#DDE8DC; --danger:#B4372F; --danger-soft:#F6E2DF; --ok:#2A6B48; --caret:#C77B1E;
+  --code-bg:#EAEFE8; --shadow:0 12px 40px -12px rgba(24,33,27,.28), 0 2px 6px rgba(24,33,27,.06);
+  --t-key:#86451B; --t-str:#2A6B48; --t-num:#8A5A12; --t-com:#768378; --t-fn:#1F6770;
+  color-scheme:light;
+}
+[data-scheme="moss"][data-theme="dark"]{
+  --bg:#060907; --surface:#0D120F; --raised:#151C18; --ink:#E2E9E3; --muted:#94A298; --faint:#6A786E;
+  --line:#243029; --line-soft:#18201B; --accent:#7CCB9B; --accent-hover:#9BDAB3; --accent-soft:#16301F;
+  --accent-ink:#06140C; --user:#1A251E; --danger:#F08A80; --danger-soft:#351B1B; --ok:#7CCB9B; --caret:#F0B25A;
+  --code-bg:#080C0A; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#E8A27C; --t-str:#93D6A9; --t-num:#E6C274; --t-com:#6A786E; --t-fn:#7FCFD0;
+  color-scheme:dark;
+}
+[data-scheme="contrast"]{
+  --bg:#EFEFEF; --surface:#FFFFFF; --raised:#FFFFFF; --ink:#000000; --muted:#2E2E2E; --faint:#555555;
+  --line:#4A4A4A; --line-soft:#D6D6D6; --accent:#0033B8; --accent-hover:#00227A; --accent-soft:#D6E2FF;
+  --accent-ink:#FFFFFF; --user:#E3E3E3; --danger:#A30000; --danger-soft:#FFE0DC; --ok:#005C2B; --caret:#B34700;
+  --code-bg:#F5F5F5; --shadow:0 12px 40px -12px rgba(0,0,0,.4), 0 0 0 1px #000;
+  --t-key:#8A1500; --t-str:#005C2B; --t-num:#7A4100; --t-com:#555555; --t-fn:#0033B8;
+  color-scheme:light;
+}
+[data-scheme="contrast"][data-theme="dark"]{
+  --bg:#000000; --surface:#000000; --raised:#121212; --ink:#FFFFFF; --muted:#D6D6D6; --faint:#A6A6A6;
+  --line:#8C8C8C; --line-soft:#3A3A3A; --accent:#FFD400; --accent-hover:#FFE45C; --accent-soft:#3D3300;
+  --accent-ink:#000000; --user:#262626; --danger:#FF9C91; --danger-soft:#4A1512; --ok:#6FE39D; --caret:#FFD400;
+  --code-bg:#0A0A0A; --shadow:0 16px 48px -12px rgba(0,0,0,.8), 0 0 0 1px #fff;
+  --t-key:#FF9E8A; --t-str:#8FE8A8; --t-num:#FFCF70; --t-com:#A6A6A6; --t-fn:#8CC8FF;
+  color-scheme:dark;
+}
