@@ -19,13 +19,8 @@ import (
 	"github.com/openai/openai-go/v3/packages/ssestream"
 	"github.com/openai/openai-go/v3/responses"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/prompt"
-)
-
-const (
-	modelsTimeout = 15 * time.Second
-	// The reply is abandoned if the provider sends nothing for this long.
-	idleTimeout = 300 * time.Second
 )
 
 // UpstreamError carries a message meant for the person using the UI.
@@ -47,11 +42,11 @@ type Model struct {
 
 var httpClient = &http.Client{Transport: &http.Transport{
 	Proxy:               http.ProxyFromEnvironment,
-	DialContext:         (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-	TLSHandshakeTimeout: 10 * time.Second,
+	DialContext:         (&net.Dialer{Timeout: config.ProviderDialTimeout, KeepAlive: config.ProviderKeepAlive}).DialContext,
+	TLSHandshakeTimeout: config.ProviderTLSHandshakeTimeout,
 	ForceAttemptHTTP2:   true,
-	MaxIdleConns:        20,
-	IdleConnTimeout:     90 * time.Second,
+	MaxIdleConns:        config.ProviderMaxIdleConns,
+	IdleConnTimeout:     config.ProviderIdleConnTimeout,
 }}
 
 // newClient builds an SDK client for one provider. Every setting the SDK would
@@ -75,7 +70,7 @@ func endpoint(base, path string) string { return strings.TrimRight(base, "/") + 
 func ListModels(ctx context.Context, baseURL, apiKey string) ([]Model, error) {
 	url := endpoint(baseURL, "/models")
 	client := newClient(baseURL, apiKey)
-	ctx, cancel := context.WithTimeout(ctx, modelsTimeout)
+	ctx, cancel := context.WithTimeout(ctx, config.ModelsTimeout)
 	defer cancel()
 
 	page, err := client.Models.List(ctx)
@@ -346,7 +341,7 @@ func StreamReply(ctx context.Context, r Request, h Handler) ([]ToolCall, error) 
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 	errIdle := errors.New("idle")
-	idle := time.AfterFunc(idleTimeout, func() { cancel(errIdle) })
+	idle := time.AfterFunc(config.ReplyIdleTimeout, func() { cancel(errIdle) })
 	defer idle.Stop()
 
 	stream := client.Responses.NewStreaming(ctx, params)
@@ -355,7 +350,7 @@ func StreamReply(ctx context.Context, r Request, h Handler) ([]ToolCall, error) 
 	tracker := &callTracker{onStart: h.OnCallStart}
 	got := false
 	for stream.Next() {
-		idle.Reset(idleTimeout)
+		idle.Reset(config.ReplyIdleTimeout)
 		ev := stream.Current()
 		switch ev.Type {
 		case "response.output_text.delta", "response.refusal.delta":
@@ -457,7 +452,7 @@ func explain(err error, url string, isResponses bool) error {
 		}
 		detail := apiErr.Message
 		if detail == "" && apiErr.Response != nil && apiErr.Response.Body != nil {
-			body, _ := io.ReadAll(io.LimitReader(apiErr.Response.Body, 4096))
+			body, _ := io.ReadAll(io.LimitReader(apiErr.Response.Body, config.ErrorBodyBytes))
 			detail = errorDetail(body)
 		}
 		msg := fmt.Sprintf("The provider returned %d.", apiErr.StatusCode)
@@ -491,8 +486,8 @@ func errorDetail(body []byte) string {
 		}
 	}
 	s := strings.TrimSpace(string(body))
-	if r := []rune(s); len(r) > 300 {
-		s = string(r[:300])
+	if r := []rune(s); len(r) > config.ErrorDetailChars {
+		s = string(r[:config.ErrorDetailChars])
 	}
 	return s
 }

@@ -9,6 +9,8 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+
+	"klean/backend/internal/config"
 )
 
 func TestBlockedAddresses(t *testing.T) {
@@ -90,7 +92,7 @@ func TestFetchLimitsAndTypes(t *testing.T) {
 	ctx := context.Background()
 
 	page, err := w.Fetch(ctx, srv.URL+"/long")
-	if err != nil || !page.Cut || page.Chars != maxPageChars || !strings.Contains(FormatPage(page), "page continues") {
+	if err != nil || !page.Cut || page.Chars != config.MaxPageChars || !strings.Contains(FormatPage(page), "page continues") {
 		t.Fatalf("long page: chars=%d cut=%v err=%v", page.Chars, page.Cut, err)
 	}
 	if _, err = w.Fetch(ctx, srv.URL+"/image"); err == nil || !strings.Contains(err.Error(), "image/png") {
@@ -140,7 +142,7 @@ func TestSearchProviders(t *testing.T) {
 	w.DuckDuckGoURL, w.TavilyURL = srv.URL+"/ddg", srv.URL+"/tavily"
 	ctx := context.Background()
 
-	if res, err := w.Search(ctx, DuckDuckGo, "", "many"); err != nil || len(res) != maxResults || res[5].URL != "https://example.com/5" {
+	if res, err := w.Search(ctx, DuckDuckGo, "", "many"); err != nil || len(res) != config.MaxSearchResults || res[5].URL != "https://example.com/5" {
 		t.Fatalf("many: %d results, %v", len(res), err)
 	}
 	if _, err := w.Search(ctx, DuckDuckGo, "", "nothing"); err == nil || !strings.Contains(err.Error(), "No results") {

@@ -10,16 +10,12 @@ import (
 	"net/http"
 	"strings"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/llm"
 	"klean/backend/internal/prompt"
 	"klean/backend/internal/store"
 	"klean/backend/internal/tools"
 )
-
-// A reply may take several requests: each time the model calls tools, they
-// are run and the model is asked again with the results. This is the most
-// requests one reply may take, so a model that keeps calling tools stops.
-const maxToolRounds = 8
 
 type sendBody struct {
 	Content       string `json:"content"`
@@ -98,7 +94,7 @@ func (s *Server) prepareSend(chatID string, body sendBody) (*prepared, error) {
 
 	pid, model := &body.ProviderID, &body.Model
 	patch := store.ChatPatch{ProviderID: &pid, Model: &model}
-	if chat.Title == "New chat" && out.userMsg != nil {
+	if chat.Title == config.DefaultChatTitle && out.userMsg != nil {
 		t := prompt.MakeTitle(out.userMsg.Content)
 		out.title, patch.Title = &t, &t
 	}
@@ -411,8 +407,8 @@ func (t *turn) run(ctx context.Context, prep *prepared) error {
 		if t.asked {
 			return nil
 		}
-		if round >= maxToolRounds {
-			t.token(fmt.Sprintf("\n\n*Stopped here: the model was still calling tools after %d rounds.*", maxToolRounds))
+		if round >= config.MaxToolRounds {
+			t.token(fmt.Sprintf("\n\n*Stopped here: the model was still calling tools after %d rounds.*", config.MaxToolRounds))
 			return nil
 		}
 	}

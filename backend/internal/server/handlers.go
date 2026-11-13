@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/llm"
 	"klean/backend/internal/store"
 	"klean/backend/internal/tools"
@@ -55,7 +56,7 @@ func (s *Server) createProvider(w http.ResponseWriter, r *http.Request) {
 		if body.Name.value() == nil || body.BaseURL.value() == nil {
 			return nil, errorf(http.StatusUnprocessableEntity, "name and baseUrl are required.")
 		}
-		if err := checkLen("name", body.Name.V, 1, 80); err != nil {
+		if err := checkLen("name", body.Name.V, 1, config.ProviderNameMaxChars); err != nil {
 			return nil, err
 		}
 		url, err := cleanURL(body.BaseURL.V)
@@ -83,7 +84,7 @@ func (s *Server) updateProvider(w http.ResponseWriter, r *http.Request) {
 		}
 		name := body.Name.value()
 		if name != nil {
-			if err := checkLen("name", *name, 1, 80); err != nil {
+			if err := checkLen("name", *name, 1, config.ProviderNameMaxChars); err != nil {
 				return nil, err
 			}
 			*name = strings.TrimSpace(*name)
@@ -156,7 +157,7 @@ func (s *Server) createChat(w http.ResponseWriter, r *http.Request) {
 		n := store.NewChat{
 			ProviderID: body.ProviderID.value(), Model: body.Model.value(),
 			Title: body.Title.V, SystemPrompt: body.SystemPrompt.V,
-			Temperature: 0.7, ContextWindow: store.DefaultContextWindow,
+			Temperature: config.DefaultTemperature, ContextWindow: config.DefaultContextWindow,
 		}
 		if t := body.Temperature.value(); t != nil {
 			n.Temperature = *t
@@ -224,7 +225,7 @@ func (s *Server) updateChat(w http.ResponseWriter, r *http.Request) {
 			p.Model = &v
 		}
 		if p.Title = body.Title.value(); p.Title != nil {
-			if err := checkLen("title", *p.Title, 1, 200); err != nil {
+			if err := checkLen("title", *p.Title, 1, config.ChatTitleMaxChars); err != nil {
 				return nil, err
 			}
 		}

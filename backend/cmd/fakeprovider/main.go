@@ -8,11 +8,12 @@ import (
 	"net/http"
 	"os"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/fakeprovider"
 )
 
 func main() {
-	port := "9100"
+	port := config.FakeProviderPort
 	if len(os.Args) > 1 {
 		port = os.Args[1]
 	}

@@ -11,23 +11,18 @@ import (
 	"net/url"
 	"strings"
 	"syscall"
-	"time"
 	"unicode/utf8"
 
 	"golang.org/x/net/html/charset"
-)
 
-const (
-	maxPageBody  = 3 << 20 // bytes read from a page
-	maxPageChars = 12000   // characters of text handed to the model
-	maxRedirects = 5
+	"klean/backend/internal/config"
 )
 
 // Page is what fetch_page returns.
 type Page struct {
 	URL   string // after redirects
 	Title string
-	Text  string // readable text, at most maxPageChars
+	Text  string // readable text, at most config.MaxPageChars
 	Chars int    // length of Text in characters
 	Cut   bool   // the page had more text than was returned
 }
@@ -71,24 +66,24 @@ func guardDial(network, address string, _ syscall.RawConn) error {
 }
 
 func newFetchClient(allowPrivate bool) *http.Client {
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	dialer := &net.Dialer{Timeout: config.FetchDialTimeout}
 	if !allowPrivate {
 		dialer.Control = guardDial
 	}
 	return &http.Client{
-		Timeout: fetchTimeout,
+		Timeout: config.FetchTimeout,
 		Transport: &http.Transport{
 			// No proxy: through one, the address check above would see the
 			// proxy's address instead of the page's.
 			Proxy:                 nil,
 			DialContext:           dialer.DialContext,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: 15 * time.Second,
-			MaxIdleConns:          4,
-			IdleConnTimeout:       30 * time.Second,
+			TLSHandshakeTimeout:   config.FetchTLSHandshakeTimeout,
+			ResponseHeaderTimeout: config.FetchResponseHeaderTimeout,
+			MaxIdleConns:          config.FetchMaxIdleConns,
+			IdleConnTimeout:       config.FetchIdleConnTimeout,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= maxRedirects {
+			if len(via) >= config.MaxRedirects {
 				return errors.New("too many redirects")
 			}
 			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
@@ -106,7 +101,7 @@ const privateMsg = "That address is on this computer or a private network, which
 func (w *Web) checkURL(raw string) (*url.URL, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || u.Host == "" {
-		return nil, failf("%q is not a full URL. It needs to start with http:// or https://.", clip(raw, 200))
+		return nil, failf("%q is not a full URL. It needs to start with http:// or https://.", clip(raw, config.ErrorURLChars))
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return nil, failf("Only http and https URLs can be fetched, not %s.", u.Scheme)
@@ -135,11 +130,11 @@ func (w *Web) Fetch(ctx context.Context, raw string) (*Page, error) {
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, failf("%q is not a URL that can be fetched.", clip(raw, 200))
+		return nil, failf("%q is not a URL that can be fetched.", clip(raw, config.ErrorURLChars))
 	}
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", config.UserAgent)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.8")
+	req.Header.Set("Accept-Language", config.AcceptLanguage)
 
 	w.clients()
 	res, err := w.fetch.Do(req)
@@ -153,10 +148,10 @@ func (w *Web) Fetch(ctx context.Context, raw string) (*Page, error) {
 	ctype := strings.ToLower(res.Header.Get("Content-Type"))
 	isHTML := ctype == "" || strings.Contains(ctype, "html")
 	if !isHTML && !isText(ctype) {
-		return nil, failf("That URL is %s, not a page of text, so it can't be read.", clip(ctype, 80))
+		return nil, failf("That URL is %s, not a page of text, so it can't be read.", clip(ctype, config.ErrorContentTypeChars))
 	}
 	// Convert to UTF-8 using the header, then a <meta> tag, then a guess.
-	body, err := charset.NewReader(io.LimitReader(res.Body, maxPageBody), res.Header.Get("Content-Type"))
+	body, err := charset.NewReader(io.LimitReader(res.Body, config.MaxPageBody), res.Header.Get("Content-Type"))
 	if err != nil {
 		return nil, failf("Reading %s failed.", u.Host)
 	}
@@ -174,8 +169,8 @@ func (w *Web) Fetch(ctx context.Context, raw string) (*Page, error) {
 	if page.Text == "" {
 		return nil, failf("The page at %s has no readable text (it may need JavaScript to show anything).", u.Host)
 	}
-	if utf8.RuneCountInString(page.Text) > maxPageChars {
-		page.Text, page.Cut = string([]rune(page.Text)[:maxPageChars]), true
+	if utf8.RuneCountInString(page.Text) > config.MaxPageChars {
+		page.Text, page.Cut = string([]rune(page.Text)[:config.MaxPageChars]), true
 	}
 	page.Chars = utf8.RuneCountInString(page.Text)
 	return page, nil
@@ -219,7 +214,7 @@ func FormatPage(p *Page) string {
 	}
 	fmt.Fprintf(&b, "URL: %s\n\n%s", p.URL, p.Text)
 	if p.Cut {
-		fmt.Fprintf(&b, "\n\n[The page continues; only the first %d characters are shown.]", maxPageChars)
+		fmt.Fprintf(&b, "\n\n[The page continues; only the first %d characters are shown.]", config.MaxPageChars)
 	}
 	return b.String()
 }

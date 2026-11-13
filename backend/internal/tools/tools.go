@@ -4,8 +4,10 @@
 package tools
 
 import (
+	"fmt"
 	"strings"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/llm"
 )
 
@@ -80,8 +82,8 @@ var defs = map[string][]llm.Tool{
 			Parameters: object([]string{"question"}, obj{
 				"question": str("The question, in one or two sentences."),
 				"options": obj{
-					"type": "array", "maxItems": 4,
-					"description": "Up to four suggested answers. Leave out for an open question.",
+					"type": "array", "maxItems": config.MaxAskOptions,
+					"description": fmt.Sprintf("Up to %d suggested answers. Leave out for an open question.", config.MaxAskOptions),
 					"items": object([]string{"label"}, obj{
 						"label":       str("The answer, a few words."),
 						"description": str("One line on what choosing it means."),

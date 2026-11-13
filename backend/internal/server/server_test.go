@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/fakeprovider"
 	"klean/backend/internal/server"
 	"klean/backend/internal/store"
@@ -203,8 +204,8 @@ func TestChatFlow(t *testing.T) {
 	e.do("POST", "/providers", map[string]any{"name": "Fake", "baseUrl": e.base}, &p)
 	var c chat
 	e.do("POST", "/chats", map[string]any{"providerId": p.ID, "model": "fake-small", "systemPrompt": "Be brief."}, &c)
-	if c.ContextWindow != store.DefaultContextWindow {
-		t.Fatalf("new chat context window: got %d, want %d", c.ContextWindow, store.DefaultContextWindow)
+	if c.ContextWindow != config.DefaultContextWindow {
+		t.Fatalf("new chat context window: got %d, want %d", c.ContextWindow, config.DefaultContextWindow)
 	}
 	send := func(extra map[string]any) []event {
 		body := map[string]any{"providerId": p.ID, "model": "fake-small"}
@@ -494,7 +495,7 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	res, _ := http.Get(srv.URL + "/api/health")
 	_ = json.NewDecoder(res.Body).Decode(&health)
 	res.Body.Close()
-	if health["app"] != "klean" {
+	if health["app"] != config.AppID {
 		t.Errorf("health: %v", health)
 	}
 }

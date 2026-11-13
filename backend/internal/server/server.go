@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/store"
 	"klean/backend/internal/tools"
 )
@@ -39,7 +40,7 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Ha
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		// "app" lets a second copy recognise one that is already running.
-		writeJSON(w, 200, map[string]any{"ok": true, "app": "klean"})
+		writeJSON(w, 200, map[string]any{"ok": true, "app": config.AppID})
 	})
 
 	mux.HandleFunc("GET /api/providers", s.listProviders)
@@ -110,7 +111,7 @@ func reply(w http.ResponseWriter, status int, v any, err error) {
 }
 
 func decode(r *http.Request, dst any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 10<<20))
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, config.MaxRequestBody))
 	if err := dec.Decode(dst); err != nil {
 		return errorf(http.StatusUnprocessableEntity, "The request body isn't valid JSON for this endpoint: %v", err)
 	}
@@ -160,15 +161,17 @@ func checkLen(field, v string, min, max int) error {
 }
 
 func checkTemperature(t float64) error {
-	if t < 0 || t > 2 {
-		return errorf(http.StatusUnprocessableEntity, "temperature must be between 0 and 2.")
+	if t < config.MinTemperature || t > config.MaxTemperature {
+		return errorf(http.StatusUnprocessableEntity, "temperature must be between %g and %g.",
+			config.MinTemperature, config.MaxTemperature)
 	}
 	return nil
 }
 
 func checkContextWindow(n int) error {
-	if n < 512 || n > 2_000_000 {
-		return errorf(http.StatusUnprocessableEntity, "contextWindow must be between 512 and 2000000.")
+	if n < config.MinContextWindow || n > config.MaxContextWindow {
+		return errorf(http.StatusUnprocessableEntity, "contextWindow must be between %d and %d.",
+			config.MinContextWindow, config.MaxContextWindow)
 	}
 	return nil
 }

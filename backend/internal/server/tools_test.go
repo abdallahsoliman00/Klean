@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/fakeprovider"
 	"klean/backend/internal/server"
 	"klean/backend/internal/store"
@@ -546,8 +547,8 @@ func TestToolRoundCap(t *testing.T) {
 	if last.name != "done" {
 		t.Fatalf("ended with %s: %v", last.name, last.data)
 	}
-	if n := len(e.fake.Requests()); n != 8 {
-		t.Fatalf("%d requests to the provider, want 8", n)
+	if n := len(e.fake.Requests()); n != config.MaxToolRounds {
+		t.Fatalf("%d requests to the provider, want %d", n, config.MaxToolRounds)
 	}
 	msg := last.data["message"].(map[string]any)
 	if !strings.Contains(msg["content"].(string), "Stopped here") || msg["stopped"] != false {
@@ -559,7 +560,7 @@ func TestToolRoundCap(t *testing.T) {
 			calls++
 		}
 	}
-	if calls != 8 || len(e.chat().Artifacts) != 8 {
+	if calls != config.MaxToolRounds || len(e.chat().Artifacts) != config.MaxToolRounds {
 		t.Fatalf("%d calls, %d artifacts", calls, len(e.chat().Artifacts))
 	}
 	// Each request carried every earlier call of the turn.

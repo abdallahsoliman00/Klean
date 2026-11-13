@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/llm"
 	"klean/backend/internal/store"
 	"klean/backend/internal/tools"
@@ -142,8 +143,8 @@ func (t *turn) artifactOutcome(a *store.Artifact, note string) outcome {
 
 func cleanTitle(title string) string {
 	title = strings.Join(strings.Fields(title), " ")
-	if r := []rune(title); len(r) > 200 {
-		title = string(r[:200])
+	if r := []rune(title); len(r) > config.ArtifactTitleChars {
+		title = string(r[:config.ArtifactTitleChars])
 	}
 	return title
 }
@@ -221,7 +222,7 @@ type askArgs struct {
 }
 
 // askUser leaves the call pending: the turn ends and the answer arrives in a
-// later request. The arguments are tidied (at most four options, none blank)
+// later request. The arguments are tidied (at most config.MaxAskOptions options, none blank)
 // because the UI renders them as they are saved.
 func (t *turn) askUser(part *store.Part) (outcome, error) {
 	var args askArgs
@@ -236,7 +237,7 @@ func (t *turn) askUser(part *store.Part) (outcome, error) {
 	}
 	options := args.Options[:0]
 	for _, o := range args.Options {
-		if o.Label = strings.TrimSpace(o.Label); o.Label != "" && len(options) < 4 {
+		if o.Label = strings.TrimSpace(o.Label); o.Label != "" && len(options) < config.MaxAskOptions {
 			o.Description = strings.TrimSpace(o.Description)
 			options = append(options, o)
 		}

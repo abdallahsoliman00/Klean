@@ -6,6 +6,8 @@ import (
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+
+	"klean/backend/internal/config"
 )
 
 func attr(n *html.Node, key string) string {
@@ -98,7 +100,7 @@ func readable(page []byte) (title, text string) {
 	}
 	title = findTitle(doc)
 	text = extract(doc, true)
-	if len(text) < 200 {
+	if len(text) < config.MinReadableChars {
 		if all := extract(doc, false); len(all) > len(text) {
 			text = all
 		}
@@ -108,7 +110,7 @@ func readable(page []byte) (title, text string) {
 
 func findTitle(n *html.Node) string {
 	if n.Type == html.ElementNode && n.DataAtom == atom.Title {
-		return clip(collapse(nodeText(n)), 200)
+		return clip(collapse(nodeText(n)), config.PageTitleChars)
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		if t := findTitle(c); t != "" {

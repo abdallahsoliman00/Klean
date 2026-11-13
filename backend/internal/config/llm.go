@@ -1,0 +1,25 @@
+package config
+
+import "time"
+
+// Talking to the model provider.
+const (
+	ModelsTimeout = 15 * time.Second // listing a provider's models
+	// ReplyIdleTimeout abandons a reply when the provider sends nothing for
+	// this long. A long reply that keeps streaming is never cut off.
+	ReplyIdleTimeout = 300 * time.Second
+
+	ProviderDialTimeout         = 10 * time.Second
+	ProviderKeepAlive           = 30 * time.Second
+	ProviderTLSHandshakeTimeout = 10 * time.Second
+	ProviderMaxIdleConns        = 20
+	ProviderIdleConnTimeout     = 90 * time.Second
+
+	ErrorBodyBytes   = 4096 // read from an error response
+	ErrorDetailChars = 300  // of an error body shown to the user
+
+	// MaxToolRounds is the most requests one reply may take: each time the
+	// model calls tools, they run and the model is asked again, so a model
+	// that keeps calling tools stops here.
+	MaxToolRounds = 8
+)

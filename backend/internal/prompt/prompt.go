@@ -5,11 +5,8 @@ package prompt
 import (
 	"strings"
 	"unicode/utf8"
-)
 
-const (
-	replyShare         = 0.25 // keep a quarter of the window free for the model's answer
-	perMessageOverhead = 4
+	"klean/backend/internal/config"
 )
 
 // Turn is one item sent to the model: a message, or (when Call is set) a tool
@@ -29,9 +26,10 @@ type Call struct {
 	Output    string // what the model was told the call returned
 }
 
-// EstimateTokens is rough and model-agnostic: about four characters per token.
+// EstimateTokens is rough and model-agnostic: config.CharsPerToken characters
+// per token, rounded up.
 func EstimateTokens(text string) int {
-	return (utf8.RuneCountInString(text) + 3) / 4
+	return (utf8.RuneCountInString(text) + config.CharsPerToken - 1) / config.CharsPerToken
 }
 
 // Cost estimates the tokens the turns take in a request.
@@ -47,9 +45,9 @@ func cost(t Turn) int {
 	if t.Call != nil {
 		// Sent as two items: the call and its output.
 		return EstimateTokens(t.Call.Name) + EstimateTokens(t.Call.Arguments) +
-			EstimateTokens(t.Call.Output) + 2*perMessageOverhead
+			EstimateTokens(t.Call.Output) + 2*config.PerMessageOverhead
 	}
-	return EstimateTokens(t.Content) + perMessageOverhead
+	return EstimateTokens(t.Content) + config.PerMessageOverhead
 }
 
 // Build picks the newest messages until the budget is used. The system prompt
@@ -63,7 +61,7 @@ func Build(systemPrompt string, history []Turn, contextWindow int) []Turn {
 // into the request: tool definitions, and the tool calls of the reply being
 // written.
 func BuildReserving(systemPrompt string, history []Turn, contextWindow, reserved int) []Turn {
-	budget := int(float64(contextWindow) * (1 - replyShare))
+	budget := int(float64(contextWindow) * (1 - config.ReplyShare))
 	used := reserved
 	if systemPrompt != "" {
 		used += EstimateTokens(systemPrompt)
@@ -95,11 +93,10 @@ func BuildReserving(systemPrompt string, history []Turn, contextWindow, reserved
 
 // MakeTitle turns the first message into a short chat title.
 func MakeTitle(text string) string {
-	const limit = 42
 	t := strings.Join(strings.Fields(text), " ")
 	r := []rune(t)
-	if len(r) <= limit {
+	if len(r) <= config.AutoTitleChars {
 		return t
 	}
-	return strings.TrimRight(string(r[:limit]), " \t\n") + "…"
+	return strings.TrimRight(string(r[:config.AutoTitleChars]), " \t\n") + "…"
 }

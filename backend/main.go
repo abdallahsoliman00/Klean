@@ -27,8 +27,8 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
-	"time"
 
+	"klean/backend/internal/config"
 	"klean/backend/internal/launch"
 	"klean/backend/internal/server"
 	"klean/backend/internal/store"
@@ -56,7 +56,7 @@ func main() {
 }
 
 func run() error {
-	port, err := strconv.Atoi(env("KLEAN_PORT", "8787"))
+	port, err := strconv.Atoi(env("KLEAN_PORT", strconv.Itoa(config.DefaultPort)))
 	if err != nil {
 		return errors.New("KLEAN_PORT must be a number")
 	}
@@ -66,7 +66,7 @@ func run() error {
 			return err
 		}
 	}
-	host := flag.String("host", env("KLEAN_HOST", "127.0.0.1"), "address to listen on")
+	host := flag.String("host", env("KLEAN_HOST", config.DefaultHost), "address to listen on")
 	flag.IntVar(&port, "port", port, "port to listen on")
 	dbPath := flag.String("db", defaultDB, "SQLite database file")
 	frontendDir := flag.String("frontend", env("KLEAN_FRONTEND", ""),
@@ -117,8 +117,8 @@ func run() error {
 	defer db.Close()
 
 	srv := &http.Server{
-		Handler:           server.New(db, static, env("KLEAN_CORS", "*")),
-		ReadHeaderTimeout: 10 * time.Second,
+		Handler:           server.New(db, static, env("KLEAN_CORS", config.DefaultCORSOrigins)),
+		ReadHeaderTimeout: config.ReadHeaderTimeout,
 	}
 	fmt.Printf("\n  Klean is running at %s\n  Database: %s\n", url, *dbPath)
 	if launch.OwnsWindow() {
@@ -138,7 +138,7 @@ func run() error {
 	defer stop()
 	go func() {
 		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		shutdown, cancel := context.WithTimeout(context.Background(), config.ShutdownTimeout)
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
 	}()
@@ -160,12 +160,12 @@ func hasFlag(name string) bool {
 
 // isKlean reports whether a Klean server answers at url.
 func isKlean(url string) bool {
-	client := http.Client{Timeout: 2 * time.Second}
+	client := http.Client{Timeout: config.HealthCheckTimeout}
 	res, err := client.Get(url + "api/health")
 	if err != nil {
 		return false
 	}
 	defer res.Body.Close()
 	var body struct{ App string }
-	return json.NewDecoder(res.Body).Decode(&body) == nil && body.App == "klean"
+	return json.NewDecoder(res.Body).Decode(&body) == nil && body.App == config.AppID
 }

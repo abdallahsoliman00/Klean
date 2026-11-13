@@ -3,6 +3,8 @@ package prompt
 import (
 	"strings"
 	"testing"
+
+	"klean/backend/internal/config"
 )
 
 func TestBuildTrimsToWindow(t *testing.T) {
@@ -72,8 +74,8 @@ func TestMakeTitle(t *testing.T) {
 	if got := MakeTitle("  hello \n there "); got != "hello there" {
 		t.Fatalf("%q", got)
 	}
-	long := MakeTitle(strings.Repeat("é", 50))
-	if []rune(long)[42] != '…' || len([]rune(long)) != 43 {
+	long := MakeTitle(strings.Repeat("é", config.AutoTitleChars+8))
+	if []rune(long)[config.AutoTitleChars] != '…' || len([]rune(long)) != config.AutoTitleChars+1 {
 		t.Fatalf("%q", long)
 	}
 }

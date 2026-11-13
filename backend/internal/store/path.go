@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"klean/backend/internal/config"
 )
 
 // DefaultPath is where the database lives unless --db or KLEAN_DB says
@@ -24,13 +26,13 @@ func DefaultPath() (string, error) {
 		if dir == "" {
 			return "", errors.New("%LOCALAPPDATA% is not set; pass --db")
 		}
-		dir = filepath.Join(dir, "Klean")
+		dir = filepath.Join(dir, config.DataDirNameDesktop)
 	case "darwin":
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", err
 		}
-		dir = filepath.Join(home, "Library", "Application Support", "Klean")
+		dir = filepath.Join(home, "Library", "Application Support", config.DataDirNameDesktop)
 	default:
 		dir = os.Getenv("XDG_DATA_HOME")
 		if dir == "" || !filepath.IsAbs(dir) {
@@ -40,7 +42,7 @@ func DefaultPath() (string, error) {
 			}
 			dir = filepath.Join(home, ".local", "share")
 		}
-		dir = filepath.Join(dir, "klean")
+		dir = filepath.Join(dir, config.DataDirName)
 	}
-	return filepath.Join(dir, "klean.db"), nil
+	return filepath.Join(dir, config.DBFileName), nil
 }

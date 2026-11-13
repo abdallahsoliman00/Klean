@@ -12,11 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"klean/backend/internal/config"
+
 	_ "modernc.org/sqlite" // pure-Go driver, registers "sqlite"
 )
-
-// DefaultContextWindow is the context window assigned to new chats.
-var DefaultContextWindow = 1_048_576
 
 var schema = fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS providers (
@@ -29,11 +28,11 @@ CREATE TABLE IF NOT EXISTS providers (
 
 CREATE TABLE IF NOT EXISTS chats (
     id              TEXT PRIMARY KEY,
-    title           TEXT NOT NULL DEFAULT 'New chat',
+    title           TEXT NOT NULL DEFAULT '%s',
     provider_id     TEXT REFERENCES providers(id) ON DELETE SET NULL,
     model           TEXT,
     system_prompt   TEXT NOT NULL DEFAULT '',
-    temperature     REAL NOT NULL DEFAULT 0.7,
+    temperature     REAL NOT NULL DEFAULT %v,
     context_window  INTEGER NOT NULL DEFAULT %d,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
@@ -73,16 +72,13 @@ CREATE TABLE IF NOT EXISTS settings (
     key    TEXT PRIMARY KEY,
     value  TEXT NOT NULL
 );
-`, DefaultContextWindow)
+`, config.DefaultChatTitle, config.DefaultTemperature, config.DefaultContextWindow)
 
 // Columns added after the first release. CREATE TABLE IF NOT EXISTS leaves an
 // existing table as it is, so these are added to older databases on open.
 var addedColumns = []struct{ table, column, decl string }{
 	{"messages", "parts", "TEXT"},
 }
-
-// Deleted chats can be restored for a day.
-const deletedRetention = 24 * time.Hour
 
 type Provider struct {
 	ID      string `json:"id"`
@@ -254,7 +250,8 @@ func Open(path string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
-	dsn := "file:" + path + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)"
+	dsn := fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=busy_timeout(%d)&_pragma=journal_mode(WAL)",
+		path, config.DBBusyTimeout.Milliseconds())
 	sqlDB, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -269,7 +266,7 @@ func Open(path string) (*DB, error) {
 		sqlDB.Close()
 		return nil, fmt.Errorf("updating schema: %w", err)
 	}
-	cutoff := NowMs() - deletedRetention.Milliseconds()
+	cutoff := NowMs() - config.DeletedRetention.Milliseconds()
 	if _, err := sqlDB.Exec("DELETE FROM chats WHERE deleted_at IS NOT NULL AND deleted_at < ?", cutoff); err != nil {
 		sqlDB.Close()
 		return nil, err
@@ -470,7 +467,7 @@ func (d *DB) CreateChat(n NewChat) (*ChatWithMessages, error) {
 	id, ts := newID(), NowMs()
 	title := n.Title
 	if title == "" {
-		title = "New chat"
+		title = config.DefaultChatTitle
 	}
 	_, err := d.sql.Exec("INSERT INTO chats ("+chatCols+") VALUES (?,?,?,?,?,?,?,?,?)",
 		id, title, n.ProviderID, n.Model, n.SystemPrompt, n.Temperature, n.ContextWindow, ts, ts)

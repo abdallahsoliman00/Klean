@@ -12,9 +12,10 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"golang.org/x/net/html"
+
+	"klean/backend/internal/config"
 )
 
 // Search providers, as saved in settings.
@@ -25,16 +26,6 @@ const (
 )
 
 func ValidSearchProvider(p string) bool { return p == DuckDuckGo || p == Brave || p == Tavily }
-
-const (
-	maxResults    = 6
-	searchTimeout = 20 * time.Second
-	fetchTimeout  = 20 * time.Second
-	maxSearchBody = 2 << 20
-	// A browser-like User-Agent: DuckDuckGo's HTML endpoint and many sites
-	// turn away clients that announce themselves as a library.
-	userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
-)
 
 // Error is a failure worth telling the model and the user about in its own words.
 type Error struct{ Msg string }
@@ -68,16 +59,16 @@ type Web struct {
 
 func NewWeb() *Web {
 	return &Web{
-		DuckDuckGoURL: "https://html.duckduckgo.com/html/",
-		BraveURL:      "https://api.search.brave.com/res/v1/web/search",
-		TavilyURL:     "https://api.tavily.com/search",
+		DuckDuckGoURL: config.DuckDuckGoURL,
+		BraveURL:      config.BraveURL,
+		TavilyURL:     config.TavilyURL,
 	}
 }
 
 // clients builds the two HTTP clients on first use, once the fields are set.
 func (w *Web) clients() {
 	w.once.Do(func() {
-		w.search = &http.Client{Timeout: searchTimeout}
+		w.search = &http.Client{Timeout: config.SearchTimeout}
 		w.fetch = newFetchClient(w.AllowPrivate)
 	})
 }
@@ -108,8 +99,8 @@ func (w *Web) Search(ctx context.Context, provider, key, query string) ([]Result
 	if err != nil {
 		return nil, err
 	}
-	if len(results) > maxResults {
-		results = results[:maxResults]
+	if len(results) > config.MaxSearchResults {
+		results = results[:config.MaxSearchResults]
 	}
 	return results, nil
 }
@@ -130,7 +121,7 @@ func (w *Web) do(req *http.Request, service string) ([]byte, int, error) {
 		return nil, 0, failf("Couldn't reach %s. Check the internet connection.", service)
 	}
 	defer res.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(res.Body, maxSearchBody))
+	body, err := io.ReadAll(io.LimitReader(res.Body, config.MaxSearchBody))
 	if err != nil {
 		return nil, 0, failf("Reading the reply from %s failed.", service)
 	}
@@ -159,9 +150,9 @@ func (w *Web) duckDuckGo(ctx context.Context, query string) ([]Result, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", config.UserAgent)
 	req.Header.Set("Accept", "text/html")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.8")
+	req.Header.Set("Accept-Language", config.AcceptLanguage)
 	body, status, err := w.do(req, "DuckDuckGo")
 	if err != nil {
 		return nil, err
@@ -251,7 +242,7 @@ func ddgTarget(href string) string {
 // ---------------- Brave ----------------
 
 func (w *Web) brave(ctx context.Context, key, query string) ([]Result, error) {
-	q := url.Values{"q": {query}, "count": {fmt.Sprint(maxResults)}}
+	q := url.Values{"q": {query}, "count": {fmt.Sprint(config.MaxSearchResults)}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.BraveURL+"?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
@@ -291,7 +282,7 @@ func (w *Web) brave(ctx context.Context, key, query string) ([]Result, error) {
 // ---------------- Tavily ----------------
 
 func (w *Web) tavily(ctx context.Context, key, query string) ([]Result, error) {
-	payload, _ := json.Marshal(map[string]any{"query": query, "max_results": maxResults})
+	payload, _ := json.Marshal(map[string]any{"query": query, "max_results": config.MaxSearchResults})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, w.TavilyURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
@@ -317,7 +308,7 @@ func (w *Web) tavily(ctx context.Context, key, query string) ([]Result, error) {
 	}
 	var out []Result
 	for _, r := range parsed.Results {
-		out = append(out, Result{Title: collapse(r.Title), URL: r.URL, Snippet: clip(collapse(r.Content), 400)})
+		out = append(out, Result{Title: collapse(r.Title), URL: r.URL, Snippet: clip(collapse(r.Content), config.SearchSnippetChars)})
 	}
 	if len(out) == 0 {
 		return nil, failf("No results for %q.", query)
