@@ -30,6 +30,7 @@
 - [x] Embed the frontend in the executable.
 - [] Make a tree where you can wander off on tangents and come back.
 - [] Add Skills and MCPs
+- [] Use either https://github.com/eKoopmans/html2pdf.js or https://github.com/SanzarRehman/HTML2PDF for html to pdf rendering for downloading.
 
 # Repo Admin
 - [x] Change the name to something more interesting than switchboard. (Now Klean.)
@@ -37,3 +38,7 @@
 - [x] Group this TODO file into priorities, features and bugs.
 - [x] Make a CI/CD pipeline that has the most recent version of the tool available
 - [] Make the README more concise and write a nice story.
+- [x] Create scripts for both the AI agents and local developers:
+    - Code linting and formatting fir checks
+    - Code type checking
+    - Run development

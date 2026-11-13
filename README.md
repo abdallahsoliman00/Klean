@@ -73,6 +73,17 @@ is pure Go, so there's no cgo.
 - If an error stops it in its own window, the window waits for Enter so you can read why.
 - For a service or autostart entry, use `--headless`: no window, no browser.
 
+## Develop
+
+Two scripts wrap the everyday loop (Go 1.26+ and Node.js 24+, the same as `run.sh`):
+
+| Script | What it does |
+|---|---|
+| `./scripts/check.sh` | Everything CI runs: `gofmt`, `oxlint`, `tsgo --noEmit`, the Vite build, `go vet` and `go test`. Add `--fix` to reformat Go and auto-fix lint findings first. |
+| `./scripts/dev.sh` | Runs the app in development: the Go backend on `:8787` plus the Vite dev server with hot reload on <http://localhost:5173>. `--mock` runs the UI alone against the in-memory mock backend; anything after `--` is passed to Vite. Ctrl+C stops both, and it uses a throwaway database in `.dev/`. |
+
+On Windows use `scripts\check.bat` and `scripts\dev.bat`. Run the check before committing.
+
 ## Responses API
 
 Replies use the OpenAI **Responses API** (`POST {base}/responses`, streamed) through the official
@@ -243,6 +254,13 @@ Closing the connection stops generation; the partial reply, including the tool c
 finished, is saved and marked as stopped.
 
 ## Tests
+
+```bash
+./scripts/check.sh          # everything CI runs; scripts\check.bat on Windows
+```
+
+That covers formatting, lint, types, the frontend build, `go vet` and the tests. To run the Go
+tests on their own:
 
 ```bash
 (cd frontend && npm ci && npm run build)   # the Go packages embed the built UI
