@@ -1,4 +1,5 @@
-// Package store keeps providers, chats, messages, artifacts, presets and settings in SQLite.
+// Package store keeps providers, chats, messages and their images, artifacts,
+// presets, skills and settings in SQLite.
 package store
 
 import (
@@ -52,6 +53,16 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_chat ON messages(chat_id, seq);
 
+-- The pictures attached to a user message, in the order they were attached.
+CREATE TABLE IF NOT EXISTS images (
+    id          TEXT PRIMARY KEY,
+    message_id  TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    media_type  TEXT NOT NULL,
+    data        BLOB NOT NULL,
+    position    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS images_message ON images(message_id, position);
+
 -- after_seq is the newest message of the chat when the artifact was made, so
 -- editing or regenerating can remove the artifacts of the replies it removes.
 CREATE TABLE IF NOT EXISTS artifacts (
@@ -82,6 +93,15 @@ CREATE TABLE IF NOT EXISTS presets (
     temperature     REAL NOT NULL DEFAULT %[2]v,
     context_window  INTEGER NOT NULL DEFAULT %[3]d,
     created_at      INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS skills (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    description   TEXT NOT NULL,
+    instructions  TEXT NOT NULL,
+    enabled       INTEGER NOT NULL DEFAULT 1,
+    created_at    INTEGER NOT NULL
 );
 `, config.DefaultChatTitle, config.DefaultTemperature, config.DefaultContextWindow)
 
@@ -121,6 +141,7 @@ type ChatWithMessages struct {
 // Message.Content is always the plain text of the message. Parts is set on
 // assistant replies and holds the text and tool calls in the order produced;
 // it is absent for user messages and for rows written before tools existed.
+// Images is set on user messages that have pictures attached.
 type Message struct {
 	ID        string  `json:"id"`
 	Role      string  `json:"role"`
@@ -129,6 +150,7 @@ type Message struct {
 	Stopped   bool    `json:"stopped"`
 	CreatedAt int64   `json:"createdAt"`
 	Parts     []Part  `json:"parts,omitempty"`
+	Images    []Image `json:"images,omitempty"`
 }
 
 const (
@@ -229,7 +251,7 @@ type Artifact struct {
 	ID        string `json:"id"`
 	ChatID    string `json:"chatId"`
 	Title     string `json:"title"`
-	Kind      string `json:"kind"`     // html, svg, markdown or code
+	Kind      string `json:"kind"`     // html, svg, markdown, code or report
 	Language  string `json:"language"` // "" unless kind is code
 	Content   string `json:"content"`
 	Version   int    `json:"version"`
@@ -569,29 +591,70 @@ func scanMessage(row interface{ Scan(...any) error }) (*Message, error) {
 	return &m, err
 }
 
+// queryer is what *sql.DB and *sql.Tx share.
+type queryer interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+// insertMessage appends a message to the chat and returns its id.
+func insertMessage(tx *sql.Tx, chatID, role, content, model string, stopped bool, parts []Part) (string, error) {
+	id, ts := newID(), NowMs()
+	if _, err := tx.Exec("INSERT INTO messages (id, chat_id, role, content, model, stopped, created_at, parts) VALUES (?,?,?,?,?,?,?,?)",
+		id, chatID, role, content, nullable(model), stopped, ts, encodeParts(parts)); err != nil {
+		return "", err
+	}
+	_, err := tx.Exec("UPDATE chats SET updated_at = ? WHERE id = ?", ts, chatID)
+	return id, err
+}
+
+// getMessage reads one message with its images.
+func getMessage(q queryer, id string) (*Message, error) {
+	m, err := scanMessage(q.QueryRow("SELECT "+messageCols+" FROM messages WHERE id = ?", id))
+	if err != nil {
+		return nil, err
+	}
+	images, err := queryImages(q, "i.message_id = ?", id)
+	m.Images = images[id]
+	return m, err
+}
+
 // AddMessage appends a message. parts is nil for user messages.
 func (d *DB) AddMessage(chatID, role, content, model string, stopped bool, parts []Part) (*Message, error) {
-	id, ts := newID(), NowMs()
+	return d.addMessage(chatID, role, content, model, stopped, parts, nil)
+}
+
+// AddUserMessage appends a user message with the pictures attached to it.
+func (d *DB) AddUserMessage(chatID, content string, images []NewImage) (*Message, error) {
+	return d.addMessage(chatID, "user", content, "", false, nil, images)
+}
+
+func (d *DB) addMessage(chatID, role, content, model string, stopped bool, parts []Part, images []NewImage) (*Message, error) {
 	tx, err := d.sql.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec("INSERT INTO messages (id, chat_id, role, content, model, stopped, created_at, parts) VALUES (?,?,?,?,?,?,?,?)",
-		id, chatID, role, content, nullable(model), stopped, ts, encodeParts(parts)); err != nil {
+	id, err := insertMessage(tx, chatID, role, content, model, stopped, parts)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec("UPDATE chats SET updated_at = ? WHERE id = ?", ts, chatID); err != nil {
+	if err := insertImages(tx, id, images); err != nil {
 		return nil, err
 	}
-	m, err := scanMessage(tx.QueryRow("SELECT "+messageCols+" FROM messages WHERE id = ?", id))
+	m, err := getMessage(tx, id)
 	if err != nil {
 		return nil, err
 	}
 	return m, tx.Commit()
 }
 
+// Messages lists a chat's messages, oldest first. Never nil, so it encodes as [].
 func (d *DB) Messages(chatID string) ([]*Message, error) {
+	images, err := queryImages(d.sql, "i.message_id IN (SELECT id FROM messages WHERE chat_id = ?)", chatID)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := d.sql.Query("SELECT "+messageCols+" FROM messages WHERE chat_id = ? ORDER BY seq", chatID)
 	if err != nil {
 		return nil, err
@@ -603,6 +666,7 @@ func (d *DB) Messages(chatID string) ([]*Message, error) {
 		if err != nil {
 			return nil, err
 		}
+		m.Images = images[m.ID]
 		out = append(out, m)
 	}
 	return out, rows.Err()
@@ -615,37 +679,51 @@ func (d *DB) SetMessageParts(messageID string, parts []Part) error {
 }
 
 // dropOrphanArtifacts deletes the artifacts made after the newest message
-// that is left, which are the ones the removed replies created.
-func dropOrphanArtifacts(tx *sql.Tx, chatID string) error {
+// that is left, which are the ones the removed replies created. The message
+// exceptID, one just added in place of those removed, doesn't count as left.
+func dropOrphanArtifacts(tx *sql.Tx, chatID, exceptID string) error {
 	_, err := tx.Exec(`DELETE FROM artifacts WHERE chat_id = ? AND after_seq >= COALESCE(
-		(SELECT MAX(seq) FROM messages WHERE chat_id = ?), 0)`, chatID, chatID)
+		(SELECT MAX(seq) FROM messages WHERE chat_id = ? AND id != ?), 0)`, chatID, chatID, exceptID)
 	return err
 }
 
-// TruncateFrom deletes a message and everything after it (used when editing),
-// along with the artifacts those messages created. It reports whether the
-// message was found.
-func (d *DB) TruncateFrom(chatID, messageID string) (bool, error) {
+// ReplaceFrom is an edit: the message and everything after it are deleted,
+// along with the artifacts those messages created, and a user message with
+// the new content takes its place, keeping the images of the one it replaces.
+// It returns nil, nil when the chat has no such message.
+func (d *DB) ReplaceFrom(chatID, messageID, content string) (*Message, error) {
 	tx, err := d.sql.Begin()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	defer tx.Rollback()
 	var seq int64
 	err = tx.QueryRow("SELECT seq FROM messages WHERE id = ? AND chat_id = ?", messageID, chatID).Scan(&seq)
 	if err == sql.ErrNoRows {
-		return false, nil
+		return nil, nil
 	}
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	if _, err := tx.Exec("DELETE FROM messages WHERE chat_id = ? AND seq >= ?", chatID, seq); err != nil {
-		return false, err
+	id, err := insertMessage(tx, chatID, "user", content, "", false, nil)
+	if err != nil {
+		return nil, err
 	}
-	if err := dropOrphanArtifacts(tx, chatID); err != nil {
-		return false, err
+	// The images move first: deleting the old message would take them with it.
+	if _, err := tx.Exec("UPDATE images SET message_id = ? WHERE message_id = ?", id, messageID); err != nil {
+		return nil, err
 	}
-	return true, tx.Commit()
+	if _, err := tx.Exec("DELETE FROM messages WHERE chat_id = ? AND seq >= ? AND id != ?", chatID, seq, id); err != nil {
+		return nil, err
+	}
+	if err := dropOrphanArtifacts(tx, chatID, id); err != nil {
+		return nil, err
+	}
+	m, err := getMessage(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	return m, tx.Commit()
 }
 
 // DropTrailingAssistant removes assistant replies at the end of a chat (used
@@ -660,7 +738,7 @@ func (d *DB) DropTrailingAssistant(chatID string) error {
 		(SELECT MAX(seq) FROM messages WHERE chat_id = ? AND role = 'user'), 0)`, chatID, chatID); err != nil {
 		return err
 	}
-	if err := dropOrphanArtifacts(tx, chatID); err != nil {
+	if err := dropOrphanArtifacts(tx, chatID, ""); err != nil {
 		return err
 	}
 	return tx.Commit()

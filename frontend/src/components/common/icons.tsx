@@ -94,6 +94,16 @@ export const LinesIcon = () => (
 export const WrenchIcon = () => (
   <Line strokeLinecap="round" strokeLinejoin="round"><path d="M9.6 2.6a3.4 3.4 0 00-3.3 4.5L2.7 10.7a1.5 1.5 0 002.1 2.1l3.6-3.6a3.4 3.4 0 004.4-4.3l-2.1 2.1-1.9-.5-.5-1.9z" /></Line>
 );
+export const ImageIcon = (p: IconProps) => (
+  <Line {...p} strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="3" width="11" height="10" rx="2.2" /><circle cx="6" cy="6.4" r="1.1" /><path d="M2.8 11.2l3-2.9 2.4 2.2 1.9-1.7 3.1 2.8" /></Line>
+);
+/** An open book: a skill the assistant reads. */
+export const SkillIcon = (p: IconProps) => (
+  <Line {...p} strokeLinecap="round" strokeLinejoin="round"><path d="M8 4.2C6.6 3.2 4.6 2.9 2.5 3.2v8.6c2.1-.3 4.1 0 5.5 1 1.4-1 3.4-1.3 5.5-1V3.2c-2.1-.3-4.1 0-5.5 1zM8 4.2v8.6" /></Line>
+);
+export const UploadIcon = (p: IconProps) => (
+  <Line {...p} strokeLinecap="round" strokeLinejoin="round"><path d="M8 10.5V3M4.8 6.1L8 3l3.2 3.1M3 13h10" /></Line>
+);
 export const SendIcon = () => (
   <svg className="i-send" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" /></svg>
 );
@@ -117,6 +127,7 @@ const KIND_ICONS: Record<string, () => React.JSX.Element> = {
   svg: () => <KindSvg><circle cx="6.5" cy="6.5" r="3.5" /><rect x="8" y="8" width="7" height="7" rx="1.5" /></KindSvg>,
   markdown: () => <KindSvg strokeLinecap="round"><path d="M4.5 2.5h6.5L14 5.5v10H4.5z" /><path d="M7 8.5h4.5M7 11.5h4.5" /></KindSvg>,
   code: () => <KindSvg strokeLinecap="round"><path d="M6.5 5.5L3 9l3.5 3.5M11.5 5.5L15 9l-3.5 3.5" /></KindSvg>,
+  report: () => <KindSvg strokeLinecap="round"><path d="M4.5 2.5h6.5L14 5.5v10H4.5z" /><path d="M7 13V11M9.25 13V8.5M11.5 13v-3" /></KindSvg>,
 };
 
 export function KindIcon({ kind }: { kind?: string }) {

@@ -2,7 +2,7 @@
 import { api } from '../api';
 import { ApiError } from '../api/errors';
 import { ART_FOCUS_MS, STATUS_NOT_FOUND } from '../config';
-import { artifactsCreatedBy } from '../lib/artifacts';
+import { artifactFilename, artifactsCreatedBy } from '../lib/artifacts';
 import { artifactSwitch, focusComposer } from '../lib/focus';
 import { artifactPanelOverlays } from '../lib/media';
 import type { Artifact, Message } from '../types';
@@ -33,6 +33,10 @@ export interface ArtifactsSlice {
   /** Drops the artifacts these messages created (the backend does the same when they are edited out). */
   forgetArtifacts(msgs: Message[]): void;
   deleteArtifact(a: Artifact): Promise<void>;
+  /** Id of the report whose PDF is being made (one at a time). */
+  pdfFor: string | null;
+  /** Renders a report to a PDF and downloads it; says so when it is done, or what to do if it failed. */
+  downloadReport(a: Artifact): Promise<void>;
   resetArtifacts(): void;
 }
 
@@ -114,6 +118,23 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
       closeIfEmpty();
       if (wasOpen && !get().art.open) focusComposer();
       get().toast(`Deleted “${a.title || 'Untitled'}”`);
+    },
+
+    pdfFor: null,
+
+    async downloadReport(a) {
+      if (get().pdfFor) return;
+      set({ pdfFor: a.id });
+      const name = artifactFilename(a);
+      try {
+        const { saveReportPdf } = await import('../lib/reportPdf'); // html2pdf.js is fetched on first use
+        await saveReportPdf(a.content || '', name);
+        get().toast(`Downloaded ${name}`);
+      } catch {
+        get().toast('The PDF couldn’t be made. Press Download PDF to try again, or ask for a shorter report.');
+      } finally {
+        set({ pdfFor: null });
+      }
     },
 
     resetArtifacts() {

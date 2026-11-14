@@ -1,12 +1,16 @@
-// Package fakeprovider is a tiny OpenAI-compatible server (Models and the
-// streaming Responses API) for tests and offline UI work. Base URL: {server}/v1.
+// Package fakeprovider is a tiny OpenAI-compatible server (Models, and
+// streaming replies over both the Responses API and Chat Completions) for
+// tests and offline UI work. Base URL: {server}/v1. NewCompletionsOnly makes
+// one without the Responses API, as many local servers are.
 //
 // The reply says how many input messages it received, so tests can check
-// context trimming. A message containing FAIL gets a 500, MIDFAIL fails
-// partway through the stream, and SLOW streams slowly.
+// context trimming, and how many images came with them. A message containing
+// FAIL gets a 500, MIDFAIL fails partway through the stream, SLOW streams
+// slowly, and NOIMAGES rejects any request that carries images with a 400.
 //
 // When the request offers tools, a trigger word in the last user message
-// makes it call one: /artifact, /code, /svg, /update, /ask, /search, /fetch
+// makes it call one: /artifact, /code, /svg, /report, /skill <name>, /update,
+// /ask, /search, /fetch
 // (see triggers below). Once the call's output comes back it answers in text.
 // /loop and /webloop call a tool on every request and never finish, NOTOOLS
 // rejects any request that carries tools with a 400.
@@ -34,18 +38,32 @@ type Fake struct {
 	requests []map[string]any
 	titles   []map[string]any // requests to name a chat
 	calls    int              // numbers the call ids
+
+	completionsOnly bool // /responses answers 404
+	missed          int  // requests /responses turned away
 }
 
 func New() *Fake { return &Fake{} }
 
-// Last returns the most recent /responses request body and headers.
+// NewCompletionsOnly returns a fake that has no Responses API: /responses
+// answers 404 and replies come from /chat/completions.
+func NewCompletionsOnly() *Fake { return &Fake{completionsOnly: true} }
+
+// ResponsesMissed is how many requests found /responses missing.
+func (f *Fake) ResponsesMissed() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.missed
+}
+
+// Last returns the most recent reply request body and headers.
 func (f *Fake) Last() (map[string]any, http.Header) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.last, f.lastHdr
 }
 
-// Requests returns every /responses request body received so far.
+// Requests returns every reply request body received so far, from either API.
 func (f *Fake) Requests() []map[string]any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -66,8 +84,20 @@ const titleReply = `"A short summary."`
 func (f *Fake) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/models", f.models)
-	mux.HandleFunc("POST /v1/responses", f.responses)
+	mux.HandleFunc("POST /v1/chat/completions", f.reply(writeCompletions))
+	if f.completionsOnly {
+		mux.HandleFunc("POST /v1/responses", f.noResponses)
+	} else {
+		mux.HandleFunc("POST /v1/responses", f.reply(writeResponses))
+	}
 	return mux
+}
+
+func (f *Fake) noResponses(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	f.missed++
+	f.mu.Unlock()
+	http.NotFound(w, r)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -93,44 +123,83 @@ type call struct {
 	args map[string]any
 }
 
-// input is what the fake needs to know about a request's input items.
+// input is what the fake needs to know about a request: the input items of
+// the Responses API, or the messages of Chat Completions.
 type input struct {
-	count      int
-	lastUser   string
-	toolOutput string // output of the last call made since the last user message
-	answered   bool   // such an output exists
-	artifactID string // id in the most recent artifact tool output
+	instructions string
+	count        int    // items, not counting a system message
+	images       int    // images attached to the user messages
+	lastUser     string // text of the last user message
+	toolOutput   string // output of the last call made since the last user message
+	answered     bool   // such an output exists
+	artifactID   string // id in the most recent artifact tool output
 }
 
-func readInput(items []any) input {
-	in := input{count: len(items)}
+// readContent returns the text of a message's content, which is a string or
+// a list of text and image parts, and how many images it has.
+func readContent(content any) (text string, images int) {
+	if s, ok := content.(string); ok {
+		return s, 0
+	}
+	parts, _ := content.([]any)
+	for _, p := range parts {
+		m, _ := p.(map[string]any)
+		switch m["type"] {
+		case "input_text", "text":
+			t, _ := m["text"].(string)
+			text += t
+		case "input_image", "image_url":
+			images++
+		}
+	}
+	return text, images
+}
+
+func readInput(body map[string]any) input {
+	in := input{}
+	in.instructions, _ = body["instructions"].(string)
+	items, _ := body["input"].([]any)
+	if items == nil {
+		items, _ = body["messages"].([]any)
+	}
 	for _, it := range items {
 		m, _ := it.(map[string]any)
+		output, isOutput := m["output"].(string) // Responses: a function_call_output item
+		if m["role"] == "tool" {                 // Chat Completions: a tool message
+			output, isOutput = m["content"].(string)
+		}
 		switch {
+		case m["role"] == "system":
+			in.instructions, _ = m["content"].(string)
+			continue
 		case m["role"] == "user":
-			in.lastUser, _ = m["content"].(string)
+			text, images := readContent(m["content"])
+			in.lastUser, in.images = text, in.images+images
 			in.answered, in.toolOutput = false, ""
-		case m["type"] == "function_call_output":
-			in.toolOutput, _ = m["output"].(string)
-			in.answered = true
+		case isOutput:
+			in.toolOutput, in.answered = output, true
 			// Artifact tools answer with JSON carrying the artifact's id.
 			var out struct{ ID string }
-			if json.Unmarshal([]byte(in.toolOutput), &out) == nil && out.ID != "" {
+			if json.Unmarshal([]byte(output), &out) == nil && out.ID != "" {
 				in.artifactID = out.ID
 			}
 		}
+		in.count++
 	}
 	return in
 }
 
+// offeredTools reads the tool names from either API's tools list.
 func offeredTools(body map[string]any) map[string]bool {
 	offered := map[string]bool{}
 	list, _ := body["tools"].([]any)
 	for _, t := range list {
-		if m, _ := t.(map[string]any); m != nil {
-			if name, _ := m["name"].(string); name != "" {
-				offered[name] = true
-			}
+		m, _ := t.(map[string]any)
+		if fn, ok := m["function"].(map[string]any); ok { // Chat Completions nests it
+			m = fn
+		}
+		if name, _ := m["name"].(string); name != "" {
+			offered[name] = true
 		}
 	}
 	return offered
@@ -155,6 +224,15 @@ const demoSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
   <path d="M40 62l14 14 28-30" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
 </svg>`
 
+const demoReport = `<!doctype html>
+<html><head><meta charset="utf-8"><title>Quarterly report</title>
+<style>body{font-family:Georgia,serif;line-height:1.5}h1,h2{font-family:system-ui,sans-serif}
+section{break-inside:avoid}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}
+tr{break-inside:avoid}.new-page{break-before:page}</style></head>
+<body><h1>Quarterly report</h1><section><h2>Summary</h2><p>Revenue grew and costs held steady.</p></section>
+<table><tr><th>Quarter</th><th>Revenue</th></tr><tr><td>Q1</td><td>120</td></tr><tr><td>Q2</td><td>140</td></tr></table>
+<section class="new-page"><h2>Outlook</h2><p>More of the same is expected.</p></section></body></html>`
+
 // triggers are checked in order; the first whose word is in the last user
 // message and whose tool was offered decides the call.
 var triggers = []struct {
@@ -170,6 +248,12 @@ var triggers = []struct {
 	}},
 	{"/svg", "create_artifact", func(input) map[string]any {
 		return map[string]any{"title": "Check mark", "kind": "svg", "content": demoSVG}
+	}},
+	{"/report", "create_report", func(input) map[string]any {
+		return map[string]any{"title": "Quarterly report", "content": demoReport}
+	}},
+	{"/skill", "use_skill", func(in input) map[string]any {
+		return map[string]any{"name": strings.Fields(after(in.lastUser, "/skill", "missing"))[0]}
 	}},
 	{"/update", "update_artifact", func(in input) map[string]any {
 		id := in.artifactID
@@ -227,98 +311,161 @@ func clip(s string, max int) string {
 	return s
 }
 
-func (f *Fake) responses(w http.ResponseWriter, r *http.Request) {
-	var body map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSON(w, 400, map[string]any{"error": map[string]any{"message": err.Error()}})
-		return
-	}
-	isTitle := body["instructions"] == config.TitleInstructions
-	f.mu.Lock()
-	if isTitle {
-		f.titles = append(f.titles, body)
-	} else {
-		f.last, f.lastHdr = body, r.Header.Clone()
-		f.requests = append(f.requests, body)
-	}
-	f.calls++
-	callNo := f.calls
-	f.mu.Unlock()
+// answer is what the fake decided to reply with.
+type answer struct {
+	model   any
+	words   []string // the text, a word at a time
+	midFail bool     // break off with an error after a few words
+	call    *call    // made after the text
+	callNo  int
+}
 
-	items, _ := body["input"].([]any)
-	in := readInput(items)
-	lastUser := in.lastUser
-	offered := offeredTools(body)
-	if strings.Contains(lastUser, "FAIL") && !strings.Contains(lastUser, "MIDFAIL") {
-		writeJSON(w, 500, map[string]any{"error": map[string]any{"message": "model exploded"}})
-		return
-	}
-	if isTitle && strings.Contains(lastUser, "NOTITLE") {
-		writeJSON(w, 500, map[string]any{"error": map[string]any{"message": "no title today"}})
-		return
-	}
-	if strings.Contains(lastUser, "NOTOOLS") && len(offered) > 0 {
-		writeJSON(w, 400, map[string]any{"error": map[string]any{"message": "this model does not support tools"}})
-		return
-	}
-	pause := 10 * time.Millisecond
-	if strings.Contains(lastUser, "SLOW") && !isTitle {
-		pause = 300 * time.Millisecond
-	}
-	toolCall := pickCall(in, offered)
-	text := fmt.Sprintf("You said: **%s**. I received %d messages.\n\n```python\nprint('hello')\n```\n\nDone.", lastUser, len(items))
-	switch {
-	case isTitle && strings.Contains(lastUser, "BLANKTITLE"):
-		text = " "
-	case isTitle:
-		text = titleReply
-	case toolCall != nil:
-		text = "On it. "
-	case in.answered:
-		text = fmt.Sprintf("The tool returned: %s\n\nDone.", clip(in.toolOutput, 160))
-	}
-	words := strings.SplitAfter(text, " ")
+// stream writes Server-Sent Events at the reply's pace.
+type stream struct {
+	w     http.ResponseWriter
+	r     *http.Request
+	pause time.Duration
+}
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.WriteHeader(200)
-	rc := http.NewResponseController(w)
+// emit sends one event; event is left out of the frame when "".
+func (s stream) emit(event string, data any) bool {
+	b, ok := data.(string)
+	if !ok {
+		raw, _ := json.Marshal(data)
+		b = string(raw)
+	}
+	if event != "" {
+		fmt.Fprintf(s.w, "event: %s\n", event)
+	}
+	if _, err := fmt.Fprintf(s.w, "data: %s\n\n", b); err != nil {
+		return false
+	}
+	return http.NewResponseController(s.w).Flush() == nil
+}
+
+// wait pauses between events; false means the client went away.
+func (s stream) wait() bool {
+	select {
+	case <-s.r.Context().Done():
+		return false
+	case <-time.After(s.pause):
+		return true
+	}
+}
+
+// midFailAfter is how many words MIDFAIL lets through.
+const midFailAfter = 3
+
+// reply handles a reply request of either API: it records the request,
+// decides the answer, and has write stream it in that API's format.
+func (f *Fake) reply(write func(stream, answer)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, 400, map[string]any{"error": map[string]any{"message": err.Error()}})
+			return
+		}
+		in := readInput(body)
+		isTitle := in.instructions == config.TitleInstructions
+		f.mu.Lock()
+		if isTitle {
+			f.titles = append(f.titles, body)
+		} else {
+			f.last, f.lastHdr = body, r.Header.Clone()
+			f.requests = append(f.requests, body)
+		}
+		f.calls++
+		callNo := f.calls
+		f.mu.Unlock()
+
+		lastUser := in.lastUser
+		offered := offeredTools(body)
+		refuse := func(status int, msg string) {
+			writeJSON(w, status, map[string]any{"error": map[string]any{"message": msg}})
+		}
+		switch {
+		case strings.Contains(lastUser, "FAIL") && !strings.Contains(lastUser, "MIDFAIL"):
+			refuse(500, "model exploded")
+			return
+		case isTitle && strings.Contains(lastUser, "NOTITLE"):
+			refuse(500, "no title today")
+			return
+		case strings.Contains(lastUser, "NOTOOLS") && len(offered) > 0:
+			refuse(400, "this model does not support tools")
+			return
+		case strings.Contains(lastUser, "NOIMAGES") && in.images > 0:
+			refuse(400, "this model does not support image input")
+			return
+		}
+		pause := 10 * time.Millisecond
+		if strings.Contains(lastUser, "SLOW") && !isTitle {
+			pause = 300 * time.Millisecond
+		}
+		toolCall := pickCall(in, offered)
+		seen := ""
+		if in.images > 0 {
+			seen = fmt.Sprintf(" and %d images", in.images)
+		}
+		text := fmt.Sprintf("You said: **%s**. I received %d messages%s.\n\n```python\nprint('hello')\n```\n\nDone.", lastUser, in.count, seen)
+		switch {
+		case isTitle && strings.Contains(lastUser, "BLANKTITLE"):
+			text = " "
+		case isTitle:
+			text = titleReply
+		case toolCall != nil:
+			text = "On it. "
+		case in.answered:
+			text = fmt.Sprintf("The tool returned: %s\n\nDone.", clip(in.toolOutput, 160))
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		write(stream{w, r, pause}, answer{
+			model: body["model"], words: strings.SplitAfter(text, " "),
+			midFail: strings.Contains(lastUser, "MIDFAIL"), call: toolCall, callNo: callNo,
+		})
+	}
+}
+
+// argsChunk is how many bytes of a call's arguments go into one event.
+const argsChunk = 120
+
+// chunks cuts s into pieces of at most argsChunk bytes.
+func chunks(s string) []string {
+	var out []string
+	for i := 0; i < len(s); i += argsChunk {
+		out = append(out, s[i:min(i+argsChunk, len(s))])
+	}
+	return out
+}
+
+// writeResponses streams the answer as Responses API events.
+func writeResponses(s stream, a answer) {
 	seq := 0
 	emit := func(v map[string]any) bool {
 		v["sequence_number"] = seq
 		seq++
-		b, _ := json.Marshal(v)
-		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", v["type"], b); err != nil {
-			return false
-		}
-		return rc.Flush() == nil
+		return s.emit(v["type"].(string), v)
 	}
-	wait := func() bool {
-		select {
-		case <-r.Context().Done():
-			return false
-		case <-time.After(pause):
-			return true
-		}
-	}
-	resp := map[string]any{"id": "resp_fake", "object": "response", "status": "in_progress", "model": body["model"], "output": []any{}}
+	resp := map[string]any{"id": "resp_fake", "object": "response", "status": "in_progress", "model": a.model, "output": []any{}}
 	emit(map[string]any{"type": "response.created", "response": resp})
-	for i, word := range words {
+	for i, word := range a.words {
 		if word == "" {
 			continue
 		}
-		if i == 3 && strings.Contains(lastUser, "MIDFAIL") {
+		if i == midFailAfter && a.midFail {
 			emit(map[string]any{"type": "error", "code": "server_error", "message": "lost the thread", "param": nil})
 			return
 		}
 		if !emit(map[string]any{"type": "response.output_text.delta", "item_id": "msg_1", "output_index": 0, "content_index": 0, "delta": word}) {
 			return
 		}
-		if !wait() {
+		if !s.wait() {
 			return
 		}
 	}
-	if toolCall != nil {
-		item, ok := streamCall(emit, wait, toolCall, callNo)
+	if a.call != nil {
+		item, ok := streamCall(emit, s.wait, a.call, a.callNo)
 		if !ok {
 			return
 		}
@@ -326,6 +473,48 @@ func (f *Fake) responses(w http.ResponseWriter, r *http.Request) {
 	}
 	resp["status"] = "completed"
 	emit(map[string]any{"type": "response.completed", "response": resp})
+}
+
+// writeCompletions streams the answer as Chat Completions chunks: the text,
+// then the call (its id and name first, its arguments in pieces), then [DONE].
+func writeCompletions(s stream, a answer) {
+	chunk := func(delta map[string]any, finish any) bool {
+		return s.emit("", map[string]any{"id": "chatcmpl_fake", "object": "chat.completion.chunk", "model": a.model,
+			"choices": []any{map[string]any{"index": 0, "delta": delta, "finish_reason": finish}}})
+	}
+	for i, word := range a.words {
+		if word == "" {
+			continue
+		}
+		if i == midFailAfter && a.midFail {
+			s.emit("", map[string]any{"error": map[string]any{"message": "lost the thread"}})
+			return
+		}
+		if !chunk(map[string]any{"content": word}, nil) || !s.wait() {
+			return
+		}
+	}
+	finish := "stop"
+	if a.call != nil {
+		finish = "tool_calls"
+		argsJSON, _ := json.Marshal(a.call.args)
+		piece := func(call map[string]any) bool {
+			call["index"] = 0
+			return chunk(map[string]any{"tool_calls": []any{call}}, nil)
+		}
+		if !piece(map[string]any{"id": fmt.Sprintf("call_fake_%d", a.callNo), "type": "function",
+			"function": map[string]any{"name": a.call.name, "arguments": ""}}) || !s.wait() {
+			return
+		}
+		for _, part := range chunks(string(argsJSON)) {
+			if !piece(map[string]any{"function": map[string]any{"arguments": part}}) {
+				return
+			}
+		}
+	}
+	if chunk(map[string]any{}, finish) {
+		s.emit("", "[DONE]")
+	}
 }
 
 // streamCall sends a function call the way the Responses API does: the item
@@ -341,11 +530,9 @@ func streamCall(emit func(map[string]any) bool, wait func() bool, c *call, n int
 	if !emit(map[string]any{"type": "response.output_item.added", "output_index": 1, "item": item}) || !wait() {
 		return nil, false
 	}
-	const chunk = 120
-	for i := 0; i < len(args); i += chunk {
-		end := min(i+chunk, len(args))
+	for _, part := range chunks(args) {
 		if !emit(map[string]any{"type": "response.function_call_arguments.delta", "item_id": item["id"],
-			"output_index": 1, "delta": args[i:end]}) {
+			"output_index": 1, "delta": part}) {
 			return nil, false
 		}
 	}

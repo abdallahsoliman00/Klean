@@ -14,10 +14,13 @@ import (
 // Tool names, as the model sees them.
 const (
 	CreateArtifact = "create_artifact"
+	CreateReport   = "create_report"
 	UpdateArtifact = "update_artifact"
 	AskUser        = "ask_user"
 	WebSearch      = "web_search"
 	FetchPage      = "fetch_page"
+	// UseSkill is offered whenever the user has enabled skills, whatever the groups.
+	UseSkill = "use_skill"
 )
 
 // Groups are what the composer switches on and off.
@@ -32,6 +35,10 @@ var AllGroups = []string{GroupArtifacts, GroupAsk, GroupWeb}
 
 // ArtifactKinds are the values create_artifact accepts for kind.
 var ArtifactKinds = []string{"html", "svg", "markdown", "code"}
+
+// KindReport is the kind of the artifacts create_report makes. It is not
+// among ArtifactKinds, so a report is only ever made through its own tool.
+const KindReport = "report"
 
 func ValidGroup(g string) bool {
 	return g == GroupArtifacts || g == GroupAsk || g == GroupWeb
@@ -66,11 +73,29 @@ var defs = map[string][]llm.Tool{
 			}),
 		},
 		{
+			Name: CreateReport,
+			Description: "Create a report: a formal, printable document the user reads as a rendered preview in the side panel " +
+				"and downloads as a PDF. Use it whenever the user asks for a report, or for a similar document meant to be " +
+				"printed or handed on (a brief, a proposal, a summary of findings). The user never sees the HTML, only the " +
+				"rendered pages, and it is turned into the PDF as it is, so it must be complete and self-contained. " +
+				"The result gives the report's id, which update_artifact needs to revise it.",
+			Parameters: object([]string{"title", "content"}, obj{
+				"title": str("The report's title, shown above the preview and used as the PDF's file name."),
+				"content": str("A complete, self-contained HTML document laid out for A4 portrait print. " +
+					"One readable column of body text; don't add page margins, they are added when the PDF is made. " +
+					"All CSS inline in a <style> element or style attributes. No JavaScript. No external resources of any kind " +
+					"(fonts, images, stylesheets): use system font stacks, inline SVG and data: URIs. " +
+					"Put break-inside: avoid on figures, table rows and a heading together with its first paragraph, " +
+					"and break-before: page where a new page should start. " +
+					"Avoid position: fixed and sticky, viewport units (vw, vh) and animations."),
+			}),
+		},
+		{
 			Name: UpdateArtifact,
-			Description: "Replace the content of an artifact created earlier in this chat. Send the complete new content, " +
+			Description: "Replace the content of an artifact or report created earlier in this chat. Send the complete new content, " +
 				"not a diff. The artifact keeps its id and its version goes up by one.",
 			Parameters: object([]string{"id", "content"}, obj{
-				"id":      str("The id that create_artifact returned."),
+				"id":      str("The id that create_artifact or create_report returned."),
 				"content": str("The full new content, replacing the old."),
 				"title":   str("A new title. Leave out to keep the current one."),
 			}),
@@ -140,7 +165,10 @@ var guidance = map[string]string{
 	GroupArtifacts: "Put substantial standalone work (a web page, an SVG, a document, a complete file or script) in an artifact " +
 		"with create_artifact, and change it with update_artifact rather than creating another. Keep short examples, " +
 		"one-liners and explanations inline in your reply. After creating or updating an artifact, describe it in a " +
-		"sentence or two; don't repeat its content.",
+		"sentence or two; don't repeat its content. When the user asks for a report, or a similar formal, printable " +
+		"document, write it with create_report instead: a complete HTML document for A4 portrait print, with inline CSS, " +
+		"no JavaScript and no external resources. The user sees it rendered and downloads it as a PDF; afterwards " +
+		"describe the report in a sentence or two and never paste its HTML into the chat.",
 	GroupAsk: "Call ask_user only when you are genuinely blocked on a choice that is the user's to make. " +
 		"For anything else, pick a sensible default and mention it.",
 	GroupWeb: "Use web_search for recent or uncertain facts and fetch_page to read a result. " +
@@ -160,4 +188,33 @@ func Guidance(groups []string) string {
 		return ""
 	}
 	return "You can call tools. " + strings.Join(lines, " ")
+}
+
+// Skill is what the model is told about a skill before it loads it.
+type Skill struct{ Name, Description string }
+
+// SkillDef is the use_skill tool.
+var SkillDef = llm.Tool{
+	Name: UseSkill,
+	Description: "Load a skill: instructions the user saved for a particular kind of task. The result is the skill's " +
+		"full instructions; follow them for the task at hand. The available skills are listed in your instructions.",
+	Parameters: object([]string{"name"}, obj{
+		"name": str("The skill's name, exactly as listed."),
+	}),
+}
+
+// SkillGuidance is appended to the instructions when the user has enabled
+// skills: what each is for and how to load one. It returns "" for no skills.
+func SkillGuidance(skills []Skill) string {
+	if len(skills) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("The user has saved skills: instructions for particular kinds of task. Before doing a task that a skill " +
+		"covers, call use_skill with {\"name\": \"<skill name>\"} to load its instructions, then follow them. " +
+		"Load a skill once per conversation, and only when the task matches its description. The skills are:")
+	for _, s := range skills {
+		fmt.Fprintf(&b, "\n- %s: %s", s.Name, s.Description)
+	}
+	return b.String()
 }

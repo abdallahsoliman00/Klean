@@ -21,7 +21,7 @@ export function useGlobalShortcuts(artifactPane: React.RefObject<HTMLElement | n
         e.preventDefault();
         s.toggleSidebar();
       } else if (e.key === 'Escape') {
-        if (s.confirmRequest) return;
+        if (s.confirmRequest || s.lightbox) return; // they close themselves
         if (s.popover) s.closePopover(true);
         else if (s.overlay || s.mobileOpen) {
           s.hideAll();

@@ -148,3 +148,48 @@ func TestDeletingProviderClearsPresets(t *testing.T) {
 		t.Fatalf("preset after provider delete: %+v %v", got, err)
 	}
 }
+
+// An edit moves the images to the message that replaces the edited one, and
+// images go with their message when it is deleted.
+func TestReplaceFromKeepsImages(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	c, _ := db.CreateChat(NewChat{})
+	first, err := db.AddUserMessage(c.ID, "look", []NewImage{{"image/png", []byte("one")}, {"image/gif", []byte("two")}})
+	if err != nil || len(first.Images) != 2 || first.Images[1].MediaType != "image/gif" {
+		t.Fatalf("add: %+v %v", first, err)
+	}
+	if _, err := db.AddMessage(c.ID, "assistant", "a cat", "m", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	edited, err := db.ReplaceFrom(c.ID, first.ID, "look closer")
+	if err != nil || edited == nil || edited.ID == first.ID || edited.Content != "look closer" {
+		t.Fatalf("replace: %+v %v", edited, err)
+	}
+	if len(edited.Images) != 2 || edited.Images[0].ID != first.Images[0].ID || edited.Images[1].ID != first.Images[1].ID {
+		t.Fatalf("images after edit: %+v, were %+v", edited.Images, first.Images)
+	}
+	msgs, _ := db.Messages(c.ID)
+	if len(msgs) != 1 || len(msgs[0].Images) != 2 {
+		t.Fatalf("messages after edit: %+v", msgs)
+	}
+	data, _ := db.ChatImageData(c.ID)
+	if img, _ := db.GetImage(first.Images[1].ID); img == nil || string(img.Data) != "two" || string(data[first.Images[0].ID]) != "one" {
+		t.Fatalf("image bytes: %+v %v", img, data)
+	}
+	if missing, err := db.ReplaceFrom(c.ID, "nope", "x"); missing != nil || err != nil {
+		t.Fatalf("replacing a missing message: %+v %v", missing, err)
+	}
+
+	// A second message's images go when an edit of the first removes it.
+	second, _ := db.AddUserMessage(c.ID, "", []NewImage{{"image/png", []byte("three")}})
+	if _, err := db.ReplaceFrom(c.ID, edited.ID, "start over"); err != nil {
+		t.Fatal(err)
+	}
+	if img, _ := db.GetImage(second.Images[0].ID); img != nil {
+		t.Fatal("image outlived its message")
+	}
+}

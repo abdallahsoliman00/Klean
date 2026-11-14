@@ -57,6 +57,7 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Ha
 	mux.HandleFunc("POST /api/chats/{id}/restore", s.restoreChat)
 	mux.HandleFunc("POST /api/chats/{id}/messages", s.sendMessage)
 
+	mux.HandleFunc("GET /api/images/{id}", s.getImage)
 	mux.HandleFunc("DELETE /api/artifacts/{id}", s.deleteArtifact)
 
 	mux.HandleFunc("GET /api/presets", s.listPresets)
@@ -64,6 +65,10 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Ha
 	mux.HandleFunc("PATCH /api/presets/{id}", s.updatePreset)
 	mux.HandleFunc("DELETE /api/presets/{id}", s.deletePreset)
 
+	mux.HandleFunc("GET /api/skills", s.listSkills)
+	mux.HandleFunc("POST /api/skills", s.createSkill)
+	mux.HandleFunc("PATCH /api/skills/{id}", s.updateSkill)
+	mux.HandleFunc("DELETE /api/skills/{id}", s.deleteSkill)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PATCH /api/settings", s.updateSettings)
 
@@ -117,8 +122,17 @@ func reply(w http.ResponseWriter, status int, v any, err error) {
 }
 
 func decode(r *http.Request, dst any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, config.MaxRequestBody))
+	return decodeLimit(r, dst, config.MaxRequestBody)
+}
+
+// decodeLimit is decode for an endpoint with its own limit on the body's size.
+func decodeLimit(r *http.Request, dst any, maxBytes int64) error {
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxBytes))
 	if err := dec.Decode(dst); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			return errorf(http.StatusUnprocessableEntity, "The request is too large: it may be at most %d MB.", maxBytes>>20)
+		}
 		return errorf(http.StatusUnprocessableEntity, "The request body isn't valid JSON for this endpoint: %v", err)
 	}
 	return nil

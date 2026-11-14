@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAutosize } from '../../hooks/useAutosize';
 
-/** Edits a sent message in place. Enter saves, Shift+Enter adds a line, Escape cancels. */
-export function EditBox({ initial, onSave, onCancel }: { initial: string; onSave: (text: string) => void; onCancel: () => void }) {
+/** Edits a sent message in place. Enter saves, Shift+Enter adds a line, Escape cancels.
+    `allowEmpty` is for a message that still says something without text (it has images). */
+export function EditBox({ initial, allowEmpty, onSave, onCancel }: { initial: string; allowEmpty?: boolean; onSave: (text: string) => void; onCancel: () => void }) {
   const [value, setValue] = useState(initial);
   const ref = useRef<HTMLTextAreaElement>(null);
   useAutosize(ref, value);
@@ -13,7 +14,7 @@ export function EditBox({ initial, onSave, onCancel }: { initial: string; onSave
   }, []);
   const save = () => {
     const v = value.trim();
-    if (v) onSave(v);
+    if (v || allowEmpty) onSave(v);
   };
   return (
     <div className="edit-box">

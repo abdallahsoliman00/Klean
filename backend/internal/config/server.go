@@ -25,15 +25,36 @@ const (
 	// FakeProviderPort is where `go run ./backend/cmd/fakeprovider` listens
 	// when no port is given.
 	FakeProviderPort = "9100"
+	// FakeProviderCompletionsArg, given after the port, makes the fake
+	// provider one without the Responses API.
+	FakeProviderCompletionsArg = "completions"
 )
 
 // Limits on what the API accepts.
 const (
 	MaxRequestBody = 10 << 20 // bytes in a JSON request body
 
+	// Images attached to a message.
+	MaxImagesPerMessage = 8
+	MaxImageBytes       = 5 << 20 // per image, decoded
+	// MaxMessageBody is the body limit of a sent message: the most images
+	// it may carry, in base64 (4 bytes for every 3), on top of its text.
+	MaxMessageBody = MaxRequestBody + MaxImagesPerMessage*MaxImageBytes*4/3
+	// ImageMB is MaxImageBytes as error messages state it.
+	ImageMB = MaxImageBytes >> 20
+	// ImageCacheControl: an image never changes once saved, so the browser may keep it.
+	ImageCacheControl = "private, max-age=31536000, immutable"
+
 	ProviderNameMaxChars = 80
 	ChatTitleMaxChars    = 200
 	PresetNameMaxChars   = 80
+
+	// Skills: a name the model calls it by, a line saying when to use it,
+	// and the instructions it loads on demand.
+	SkillNameMaxChars         = 64
+	SkillNamePattern          = "^[a-z0-9-]+$"
+	SkillDescriptionMaxChars  = 1024
+	SkillInstructionsMaxChars = 100_000
 
 	MinTemperature = 0.0
 	MaxTemperature = 2.0
@@ -41,3 +62,6 @@ const (
 	MinContextWindow = 512
 	MaxContextWindow = 2_000_000
 )
+
+// ImageTypes are the media types a message's images may have.
+var ImageTypes = []string{"image/png", "image/jpeg", "image/webp", "image/gif"}

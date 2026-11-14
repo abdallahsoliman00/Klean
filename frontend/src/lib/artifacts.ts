@@ -1,6 +1,7 @@
 /* Labels, file names and highlighting languages for artifacts. */
 import {
-  ARTIFACT_KIND_EXTENSION, ARTIFACT_KIND_LABELS, ARTIFACT_KIND_LANGUAGE, FALLBACK_EXTENSION, LANGUAGE_EXTENSION, MAX_FILENAME_CHARS,
+  ARTIFACT_CREATE_TOOLS, ARTIFACT_KIND_EXTENSION, ARTIFACT_KIND_LABELS, ARTIFACT_KIND_LANGUAGE, FALLBACK_EXTENSION, LANGUAGE_EXTENSION,
+  MAX_FILENAME_CHARS, REPORT_KIND,
 } from '../config';
 import type { Message } from '../types';
 import { languageName } from './highlight';
@@ -10,6 +11,9 @@ export function kindLabel(a: { kind?: string; language?: string }): string {
   if (a.kind === 'code') return languageName(a.language) || 'Code';
   return ARTIFACT_KIND_LABELS[a.kind ?? ''] || a.kind || 'Artifact';
 }
+
+/** A report is shown as pages and downloaded as a PDF; the HTML it is made of is never shown. */
+export const isReport = (a?: { kind?: string }) => a?.kind === REPORT_KIND;
 
 /** highlight.js language for the Code tab ('' when unknown). */
 export const codeLanguage = (a: { kind: string; language: string }) =>
@@ -32,6 +36,6 @@ export function artifactFilename(a: { kind: string; language: string; title: str
 export function artifactsCreatedBy(msgs: Message[]): Set<string> {
   const ids = new Set<string>();
   for (const m of msgs)
-    for (const p of m.parts || []) if (p.type === 'tool' && p.name === 'create_artifact' && p.result?.artifactId) ids.add(p.result.artifactId);
+    for (const p of m.parts || []) if (p.type === 'tool' && ARTIFACT_CREATE_TOOLS.includes(p.name) && p.result?.artifactId) ids.add(p.result.artifactId);
   return ids;
 }

@@ -170,10 +170,21 @@ Other scripts:
 | `npm run dev:mock`  | the same, with an in-memory mock backend instead (`src/api/mock`), for UI work with no backend at all |
 | `npm run typecheck` | `tsgo --noEmit` |
 | `npm run lint`      | `oxlint` |
+| `npm test`          | the few plain-Node tests in `frontend/tests` (the SKILL.md parser) |
 
 Tunable values (timeouts, sizes, limits, defaults, storage keys, endpoint paths) live in
 `frontend/src/config.ts`. Markdown, sanitising and highlighting come from the `marked`, `dompurify`
 and `highlight.js` packages; fonts are bundled from `src/assets/fonts`, so the app works offline.
+
+A report (`create_report`) is shown as A4 pages and downloaded as a PDF made in the browser with
+`html2pdf.js`, which is loaded only when **Download PDF** is pressed. The report's HTML is untrusted:
+it is sanitised with DOMPurify and only ever placed in a frame that is sandboxed without
+`allow-scripts` and has a Content-Security-Policy that loads nothing from the network
+(`src/lib/report.ts`).
+
+In the mock (`npm run dev:mock`), these words in a message show each tool's UI: `/artifact`, `/code`,
+`/svg`, `/md`, `/report`, `/update`, `/ask`, `/askmany`, `/search`, `/fetch`, `/fail`, `/skill <name>`;
+`NOIMAGES` makes the model refuse attached images and `/notools` makes it refuse tools.
 
 To serve a built copy without rebuilding the executable, point the backend at it:
 `go run ./backend --frontend frontend/dist`. To host the UI on another origin, start the backend

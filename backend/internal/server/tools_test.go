@@ -53,12 +53,17 @@ type toolEnv struct {
 
 func setupTools(t *testing.T, opts ...server.Option) *toolEnv {
 	t.Helper()
+	return setupToolsWith(t, fakeprovider.New(), opts...)
+}
+
+// setupToolsWith is setupTools with the given fake as the provider.
+func setupToolsWith(t *testing.T, fake *fakeprovider.Fake, opts ...server.Option) *toolEnv {
+	t.Helper()
 	db, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	fake := fakeprovider.New()
 	up := httptest.NewServer(fake.Handler())
 	api := httptest.NewServer(server.New(db, nil, "*", opts...))
 	t.Cleanup(func() { api.Close(); up.Close() })

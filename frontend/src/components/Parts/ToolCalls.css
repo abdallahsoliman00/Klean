@@ -10,6 +10,7 @@
 .trow a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .trow a:hover{text-decoration-color:currentColor}
 .trow q{quotes:"“" "”";color:var(--ink)}
+.trow code{font-family:var(--mono);font-size:12px;color:var(--ink)}
 .trow.err>svg{color:var(--danger)}
 .trow.err{align-items:flex-start;padding:4px 0}
 .trow.err>svg{margin-top:2px}

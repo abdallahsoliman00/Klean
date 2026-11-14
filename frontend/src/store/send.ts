@@ -4,8 +4,9 @@
 import { api } from '../api';
 import { ApiError } from '../api/errors';
 import { PENDING_MESSAGE_ID, STATUS_CONFLICT } from '../config';
+import { dataUrl, preloadImage } from '../lib/images';
 import { findToolPart, patchToolPart, skipPendingQuestions } from '../lib/parts';
-import type { Message, Part, SendCallbacks, ToolPart } from '../types';
+import type { ImageInput, Message, MessageImage, Part, SendCallbacks, ToolPart } from '../types';
 import { summaryOf, withArtifacts } from './chats';
 import type { Slice } from './types';
 
@@ -24,6 +25,8 @@ export interface LiveReply {
 
 export interface SendOptions {
   content?: string;
+  /** Images for a new message. An edited message keeps the ones it had. */
+  images?: ImageInput[];
   editMessageId?: string;
   regenerate?: boolean;
   answer?: { callId: string; text: string };
@@ -49,7 +52,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => ({
     get().streaming?.abort();
   },
 
-  async send({ content = '', editMessageId, regenerate, answer }) {
+  async send({ content = '', images = [], editMessageId, regenerate, answer }) {
     if (get().streaming) return;
     let created = false;
     if (!get().chat) {
@@ -70,9 +73,12 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => ({
       setMessages((m) => patchToolPart(m, answer.callId, { status: 'done', result: { answer: answer.text } }));
     } else {
       let messages = skipPendingQuestions(get().chat!.messages);
+      // shown at once from the local copies; an edited message keeps the images it has
+      let shown: MessageImage[] = images.map((image, i) => ({ id: `local-${i}`, mediaType: image.mediaType, url: dataUrl(image) }));
       if (editMessageId) {
         const i = messages.findIndex((m) => m.id === editMessageId);
         if (i > -1) {
+          shown = messages[i].images ?? [];
           get().forgetArtifacts(messages.slice(i));
           messages = messages.slice(0, i);
         }
@@ -84,7 +90,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => ({
         messages = messages.slice(0, end);
       } else {
         const key = `pending-${Date.now()}`;
-        messages = [...messages, { id: PENDING_MESSAGE_ID, key, role: 'user', content }];
+        messages = [...messages, { id: PENDING_MESSAGE_ID, key, role: 'user', content, images: shown }];
         set({ enterKey: key });
       }
       setMessages(() => messages);
@@ -119,7 +125,21 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => ({
     let answered = false;
     const callbacks: SendCallbacks = {
       signal: ctrl.signal,
-      onUser: (um) => setMessages((ms) => ms.map((m) => (m.id === PENDING_MESSAGE_ID ? { ...m, id: um.id, createdAt: um.createdAt ?? m.createdAt } : m))),
+      onUser: (um) => {
+        // the local copies stay on screen until the server's have loaded, so nothing flickers
+        const saved = um.images ?? [];
+        setMessages((ms) =>
+          ms.map((m) =>
+            m.id === PENDING_MESSAGE_ID
+              ? { ...m, id: um.id, createdAt: um.createdAt ?? m.createdAt, images: saved.map((image, i) => ({ ...image, url: m.images?.[i]?.url })) }
+              : m,
+          ),
+        );
+        void Promise.all(saved.map((image) => preloadImage(api.imageUrl(image.id)))).then(
+          () => setMessages((ms) => ms.map((m) => (m.id === um.id ? { ...m, images: saved } : m))),
+          () => {}, // the local copies stay
+        );
+      },
       onAnswered: ({ part }) => {
         answered = true;
         if (answer && part) setMessages((ms) => patchToolPart(ms, answer.callId, part));
@@ -156,7 +176,16 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => ({
     try {
       const res = await api.chats.send(
         chatId,
-        { content: answer ? '' : content, providerId: sel.providerId, model: sel.model, editMessageId, regenerate, tools: get().enabledTools(), ...(answer ? { answer } : {}) },
+        {
+          content: answer ? '' : content,
+          ...(images.length && !editMessageId && !regenerate && !answer ? { images } : {}),
+          providerId: sel.providerId,
+          model: sel.model,
+          editMessageId,
+          regenerate,
+          tools: get().enabledTools(),
+          ...(answer ? { answer } : {}),
+        },
         callbacks,
       );
       cancelAnimationFrame(frame);
@@ -174,11 +203,12 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => ({
       cancelAnimationFrame(frame);
       const e = err as ApiError;
       if (isCurrent() && get().chat!.messages.some((m) => m.id === PENDING_MESSAGE_ID)) {
-        // never reached the server: give the text back
+        // never reached the server: give the text and the images back
         setMessages((ms) => ms.filter((m) => m.id !== PENDING_MESSAGE_ID));
         clearLive();
         set((s) => ({ threadVersion: s.threadVersion + 1 }));
         if (!get().composerText) get().setComposerText(content);
+        if (!editMessageId && !get().attachments.length) get().setAttachments(images);
         get().toast(e.message);
         return;
       }

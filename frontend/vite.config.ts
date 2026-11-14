@@ -22,8 +22,9 @@ export default defineConfig({
   // relative asset URLs, so `--frontend <folder>` and the embedded copy both work
   base: './',
   build: {
-    // one bundle is fine for a local app; highlight.js alone is most of it
-    chunkSizeWarningLimit: 600,
+    // one bundle is fine for a local app; highlight.js alone is most of it. The other chunk is
+    // html2pdf.js, fetched only when a report is downloaded as a PDF.
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     proxy: { [API_PREFIX]: DEV_BACKEND_URL },

@@ -23,6 +23,9 @@ export const ENDPOINTS = {
   chatRestore: (id: string) => `/chats/${id}/restore`,
   chatMessages: (id: string) => `/chats/${id}/messages`,
   artifact: (id: string) => `/artifacts/${id}`,
+  image: (id: string) => `/images/${id}`,
+  skills: '/skills',
+  skill: (id: string) => `/skills/${id}`,
   settings: '/settings',
   presets: '/presets',
   preset: (id: string) => `/presets/${id}`,
@@ -134,6 +137,28 @@ export const MAX_FILENAME_CHARS = 80;
 /** Matches the backend's limit on a preset's name. */
 export const PRESET_NAME_MAX_CHARS = 80;
 
+/* ---------- images in messages (the backend enforces the same limits) ---------- */
+
+export const IMAGE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+export const MAX_IMAGES_PER_MESSAGE = 8;
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Bigger images are shrunk in the browser before upload: the longest side in px, and the JPEG quality. */
+export const IMAGE_DOWNSCALE = { maxSide: 2048, quality: 0.85 } as const;
+
+/* ---------- skills (the backend enforces the same limits) ---------- */
+
+export const SKILL_NAME_MAX_CHARS = 64;
+export const SKILL_DESCRIPTION_MAX_CHARS = 1024;
+export const SKILL_INSTRUCTIONS_MAX_CHARS = 100000;
+/** Above this share of the description limit, the editor shows the count. */
+export const SKILL_COUNT_FROM_SHARE = 0.8;
+export const SKILL_FILE_MAX_BYTES = 1024 * 1024;
+export const SKILL_FILE_ACCEPT = '.md,.markdown,text/markdown';
+
+/** How the backend's advice for a model without tool support reads. When it comes back although the
+    composer's tools are off, the tool in the request was use_skill, and the reply error says so. */
+export const TOOLS_UNSUPPORTED_MARK = "doesn't appear to support tools";
+
 /* ---------- message ids ---------- */
 
 /** Id of the user message shown before the backend confirms it. */
@@ -174,13 +199,19 @@ export const ARTIFACT_KIND_LABELS: Record<string, string> = {
   svg: 'SVG image',
   markdown: 'Document',
   code: 'Code',
+  report: 'PDF report',
 };
+
+/** A report is a document to read and download as a PDF; its HTML is never shown. */
+export const REPORT_KIND = 'report';
+/** The tools whose result is a new artifact. */
+export const ARTIFACT_CREATE_TOOLS: readonly string[] = ['create_artifact', 'create_report'];
 
 /** highlight.js language for kinds that are not "code". */
 export const ARTIFACT_KIND_LANGUAGE: Record<string, string> = { html: 'xml', svg: 'xml', markdown: 'markdown' };
 
 /** Download extension for kinds that are not "code". */
-export const ARTIFACT_KIND_EXTENSION: Record<string, string> = { html: 'html', svg: 'svg', markdown: 'md' };
+export const ARTIFACT_KIND_EXTENSION: Record<string, string> = { html: 'html', svg: 'svg', markdown: 'md', report: 'pdf' };
 
 /** Download extension by code language. */
 export const LANGUAGE_EXTENSION: Record<string, string> = {
@@ -196,6 +227,28 @@ export const FALLBACK_EXTENSION = 'txt';
 /** Page wrapped around an SVG artifact in its preview frame. */
 export const SVG_PREVIEW_HEAD =
   '<!doctype html><meta charset="utf-8"><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#fff;padding:24px;box-sizing:border-box}svg{max-width:100%;max-height:100%;height:auto}</style>';
+
+/* ---------- reports ---------- */
+
+export const CSS_PX_PER_MM = 96 / 25.4;
+/** The page a report is laid out on, previewed on and printed to: A4 portrait. */
+export const REPORT_PAGE = { widthMm: 210, heightMm: 297, marginMm: 14 } as const;
+/** The preview's sheets: never drawn larger than `maxFit` times life size, `gutterPx` from the panel's edges. */
+export const REPORT_PREVIEW = { maxFit: 1.25, gutterPx: 20 } as const;
+export const REPORT_PDF = {
+  /** Canvas pixels per CSS pixel: 2 keeps text sharp when the PDF is zoomed or printed. */
+  scale: 2,
+  image: { type: 'jpeg', quality: 0.98 },
+  /** html2pdf.js's page-break modes: CSS break-before/after/inside, and its .html2pdf__page-break class. */
+  pagebreakModes: ['css', 'legacy'],
+  /** Never split across two pages, when they fit on one. */
+  avoid: 'tr, p, li, h1, h2, h3, h4, h5, h6, img, svg, figure, blockquote, pre',
+  /** Browsers refuse taller canvases; a longer report is rendered at a lower scale to fit. */
+  maxCanvasPx: 32000,
+  timeoutMs: 90000,
+} as const;
+/** What a report's frame may load: nothing from the network, and no script. */
+export const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";
 
 /* ---------- sidebar date groups ---------- */
 

@@ -1,5 +1,5 @@
 /* Seed data for the in-memory mock backend. */
-import type { Artifact, Chat, Preset, SearchResult } from '../../types';
+import type { Artifact, Chat, Preset, SearchResult, Skill } from '../../types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 const now = Date.now(),
@@ -28,6 +28,18 @@ export const presets: Preset[] = [
   { id: 'pr1', name: 'Careful coder', providerId: 'p1', model: 'qwen2.5-coder:14b', systemPrompt: 'You are a careful senior engineer. Prefer small, tested changes.', temperature: 0.2, contextWindow: 131072 },
   { id: 'pr2', name: 'Brainstorm', providerId: 'p1', model: 'llama2:7b', systemPrompt: 'Offer many ideas before judging any of them.', temperature: 1.2, contextWindow: 32768 },
 ];
+
+export const skills: Skill[] = [
+  { id: 'sk1', name: 'weekly-report', enabled: true,
+    description: 'Writes the weekly status report. Use when asked for a status update, a weekly summary or what the team shipped.',
+    instructions: '# Weekly report\n\n1. Start with what shipped, one line each.\n2. Then what is at risk, and why.\n3. End with what is planned for next week.\n\nKeep it to one page. No adjectives.' },
+  { id: 'sk2', name: 'code-review', enabled: false,
+    description: 'Reviews a diff for bugs first, then clarity. Use when asked to review code or a pull request.',
+    instructions: '# Code review\n\nRead the whole change before commenting.\n\n- Bugs and data loss first.\n- Then names and structure.\n- Say what to do, not only what is wrong.' },
+];
+
+/** The bytes of uploaded images, as data: URLs by id (the real backend serves them at /images/:id). */
+export const images = new Map<string, string>();
 
 export const SAMPLE = {
   html: `<!doctype html>

@@ -195,7 +195,7 @@ func TestUnreachableAndBadProviders(t *testing.T) {
 		t.Fatalf("missing name accepted: %d", code)
 	}
 
-	// A server with a plain-text 404 (no Responses API, wrong path).
+	// A server with a plain-text 404 on every path (wrong base URL).
 	e.do("POST", "/providers", map[string]any{"name": "Wrong", "baseUrl": strings.TrimSuffix(e.base, "/v1") + "/nope"}, &p)
 	if code := e.do("GET", "/providers/"+p.ID+"/models", nil, &detail); code != 502 || !strings.Contains(detail.Detail, "404") {
 		t.Fatalf("plain 404 on models: %d %q", code, detail.Detail)
@@ -204,7 +204,7 @@ func TestUnreachableAndBadProviders(t *testing.T) {
 	e.do("POST", "/chats", map[string]any{}, &c)
 	ev := e.send(c.ID, map[string]any{"providerId": p.ID, "model": "m", "content": "hi"})
 	last := ev[len(ev)-1]
-	if last.name != "error" || !strings.Contains(last.data["message"].(string), "Responses API") {
+	if last.name != "error" || !strings.Contains(last.data["message"].(string), "neither /responses nor /chat/completions") {
 		t.Fatalf("plain 404 on responses: %+v", last)
 	}
 }

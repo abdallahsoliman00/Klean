@@ -51,4 +51,11 @@ export const httpApi: Api = {
     get: () => req('GET', ENDPOINTS.settings),
     update: (patch) => req('PATCH', ENDPOINTS.settings, patch),
   },
+  skills: {
+    list: () => req('GET', ENDPOINTS.skills),
+    create: (data) => req('POST', ENDPOINTS.skills, data),
+    update: (id, patch) => req('PATCH', ENDPOINTS.skill(id), patch),
+    remove: (id) => req('DELETE', ENDPOINTS.skill(id)),
+  },
+  imageUrl: (id) => ROOT + ENDPOINTS.image(id),
 };

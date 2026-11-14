@@ -1,7 +1,8 @@
 /* The mock's replies: plain text, or a scripted tool call when the message has a trigger word. */
 import { MOCK_LATENCY, type ToolGroup } from '../../config';
 import type { Artifact, Part, SendCallbacks, ToolArgs, ToolPart } from '../../types';
-import { artifacts, replies, SAMPLE, searchResults, uid, type MockChat } from './data';
+import { artifacts, replies, SAMPLE, searchResults, skills, uid, type MockChat } from './data';
+import { SAMPLE_REPORT } from './report';
 import { sleep } from './helpers';
 
 let replyIndex = 0;
@@ -10,6 +11,8 @@ const STOP = Symbol('stopped');
 interface ReplyInput {
   chat: MockChat;
   prompt: string;
+  /** How many images came with the message. */
+  images: number;
   /** The user's answer, when this reply continues after an ask_user question. */
   answered: string | null;
   tools: Set<ToolGroup>;
@@ -17,7 +20,7 @@ interface ReplyInput {
 }
 
 /** Streams a reply through the callbacks and returns its parts. Stops quietly when aborted. */
-export async function scriptedReply({ chat, prompt, answered, tools, cb }: ReplyInput): Promise<Part[]> {
+export async function scriptedReply({ chat, prompt, images, answered, tools, cb }: ReplyInput): Promise<Part[]> {
   const parts: Part[] = [];
   const alive = () => {
     if (cb.signal?.aborted) throw STOP;
@@ -78,6 +81,19 @@ export async function scriptedReply({ chat, prompt, answered, tools, cb }: Reply
     } else if (tools.has('artifacts') && has('/md')) {
       await tool('create_artifact', { title: 'Siwa in four days', kind: 'markdown', content: SAMPLE.markdown }, create('Siwa in four days', 'markdown', '', SAMPLE.markdown), 900);
       await say('The plan is written up as a document.');
+    } else if (tools.has('artifacts') && has('/report')) {
+      await say('I’ll write that up as a report.\n\n');
+      const title = 'Summer punctuality review';
+      await tool('create_report', { title, content: SAMPLE_REPORT }, create(title, 'report', '', SAMPLE_REPORT), 1800);
+      await say('The report is in the panel: four pages, with the route table, the monthly chart and the August log. **Download PDF** saves it.');
+    } else if (has('/skill')) {
+      // offered whenever a skill is on, whatever the composer's tools are set to
+      const name = /\/skill\s+([\w-]+)/.exec(prompt)?.[1] ?? skills.find((s) => s.enabled)?.name ?? 'weekly-report';
+      const part = await tool('use_skill', { name }, () => {
+        if (!skills.some((s) => s.name === name && s.enabled)) throw new Error(`There is no enabled skill called ${name}.`);
+        return { result: { name } };
+      }, 300);
+      await say(part.status === 'done' ? `I’ve read the **${name}** skill and will follow it from here.` : 'I’ll carry on without it.');
     } else if (tools.has('artifacts') && has('/update')) {
       const a = artifacts.filter((x) => x.chatId === chat.id).at(-1);
       await say('Revising the most recent one.\n\n');
@@ -88,6 +104,7 @@ export async function scriptedReply({ chat, prompt, answered, tools, cb }: Reply
           a.kind === 'html' ? a.content.replace(/<h1>[^<]*<\/h1>/, `<h1>Tide table, revised ${stamp}</h1>`)
           : a.kind === 'svg' ? a.content.replace('#f0a75a', '#d6453d')
           : a.kind === 'markdown' ? a.content + `\nRevised at ${stamp}.\n`
+          : a.kind === 'report' ? a.content.replace(/<div class="meta">/, `<div class="meta">Revised ${stamp}. `)
           : a.content + `\n# revised at ${stamp}\n`;
         a.version++;
         a.updatedAt = Date.now();
@@ -116,6 +133,7 @@ export async function scriptedReply({ chat, prompt, answered, tools, cb }: Reply
       });
       await say('I couldn’t search just now, so this is from memory: Alexandria’s tides are small, usually under half a metre.');
     } else {
+      if (images) await say(`I can see the ${images === 1 ? 'image' : `${images} images`} you sent.\n\n`);
       await say(replies[replyIndex++ % replies.length]);
     }
   } catch (e) {

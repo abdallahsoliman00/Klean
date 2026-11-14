@@ -5,6 +5,7 @@ import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { Menu } from './components/common/Menu';
 import { Scrim } from './components/common/Scrim';
 import { Toasts } from './components/common/Toasts';
+import { Lightbox } from './components/Images/Lightbox';
 import { ModelPalette } from './components/Palette/ModelPalette';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { Sidebar } from './components/Sidebar/Sidebar';
@@ -44,6 +45,7 @@ export function App() {
       <Menu />
       <Toasts />
       <ConfirmDialog />
+      <Lightbox />
     </>
   );
 }

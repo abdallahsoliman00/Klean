@@ -3,6 +3,7 @@ import { useStickyScroll } from '../../hooks/useStickyScroll';
 import { useThreadScrolling } from '../../hooks/useThreadScrolling';
 import { useStore } from '../../store';
 import { Composer } from '../Composer/Composer';
+import { DropZone } from '../Images/DropZone';
 import { Topbar } from '../Topbar/Topbar';
 import { Thread } from './Thread';
 
@@ -19,6 +20,7 @@ export function ChatView() {
         <Thread />
       </div>
       <Composer showJump={scroll.awayFromBottom && hasMessages} onJump={() => scroll.jump(true)} />
+      <DropZone />
     </main>
   );
 }

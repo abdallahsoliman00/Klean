@@ -15,6 +15,11 @@ const (
 	ProviderMaxIdleConns        = 20
 	ProviderIdleConnTimeout     = 90 * time.Second
 
+	// The two APIs a provider may speak, as paths under its base URL.
+	// /responses is tried first; a provider without it gets /chat/completions.
+	ResponsesPath   = "/responses"
+	CompletionsPath = "/chat/completions"
+
 	ErrorBodyBytes   = 4096 // read from an error response
 	ErrorDetailChars = 300  // of an error body shown to the user
 

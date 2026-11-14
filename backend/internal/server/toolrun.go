@@ -91,8 +91,12 @@ func (t *turn) dispatch(ctx context.Context, name string, part *store.Part) (out
 	switch name {
 	case tools.CreateArtifact:
 		return t.createArtifact(part.Args)
+	case tools.CreateReport:
+		return t.createReport(part.Args)
 	case tools.UpdateArtifact:
 		return t.updateArtifact(part.Args)
+	case tools.UseSkill:
+		return t.useSkill(part.Args)
 	case tools.AskUser:
 		return t.askUser(part)
 	case tools.WebSearch:
@@ -102,9 +106,9 @@ func (t *turn) dispatch(ctx context.Context, name string, part *store.Part) (out
 	}
 }
 
-// offered reports whether the tool belongs to a group this request enabled.
+// offered reports whether the tool was among those this request offered.
 func (t *turn) offered(name string) bool {
-	for _, def := range tools.Defs(t.groups) {
+	for _, def := range t.tools {
 		if def.Name == name {
 			return true
 		}
@@ -162,22 +166,39 @@ func (t *turn) createArtifact(raw json.RawMessage) (outcome, error) {
 	if !valid {
 		return outcome{}, failTool("kind must be one of %s.", strings.Join(tools.ArtifactKinds, ", "))
 	}
-	if strings.TrimSpace(args.Content) == "" {
-		return outcome{}, failTool("content is empty.")
-	}
-	title := cleanTitle(args.Title)
-	if title == "" {
-		title = "Untitled"
-	}
 	language := ""
 	if kind == "code" {
 		language = strings.ToLower(strings.TrimSpace(args.Language))
 	}
-	a, err := t.s.db.CreateArtifact(t.chatID, title, kind, language, args.Content)
+	return t.newArtifact(args.Title, kind, language, args.Content,
+		"Created. The user sees it in a panel beside the chat; don't repeat its content.")
+}
+
+// createReport makes an artifact of the report kind, which the user sees
+// rendered and downloads as a PDF.
+func (t *turn) createReport(raw json.RawMessage) (outcome, error) {
+	var args struct{ Title, Content string }
+	if err := parseArgs(raw, &args); err != nil {
+		return outcome{}, err
+	}
+	return t.newArtifact(args.Title, tools.KindReport, "", args.Content,
+		"Created. The user sees the rendered report in a panel beside the chat and can download it as a PDF; "+
+			"don't paste its HTML into the chat.")
+}
+
+// newArtifact saves an artifact and announces it. note is what the model is told.
+func (t *turn) newArtifact(title, kind, language, content, note string) (outcome, error) {
+	if strings.TrimSpace(content) == "" {
+		return outcome{}, failTool("content is empty.")
+	}
+	if title = cleanTitle(title); title == "" {
+		title = "Untitled"
+	}
+	a, err := t.s.db.CreateArtifact(t.chatID, title, kind, language, content)
 	if err != nil {
 		return outcome{}, err
 	}
-	return t.artifactOutcome(a, "Created. The user sees it in a panel beside the chat; don't repeat its content."), nil
+	return t.artifactOutcome(a, note), nil
 }
 
 func (t *turn) updateArtifact(raw json.RawMessage) (outcome, error) {
@@ -206,6 +227,26 @@ func (t *turn) updateArtifact(raw json.RawMessage) (outcome, error) {
 		return outcome{}, failTool("This chat has no artifact with id %q. It may have been deleted; create a new one instead.", args.ID)
 	}
 	return t.artifactOutcome(a, "Updated. The user sees the new version in the panel."), nil
+}
+
+// ---------------- skills ----------------
+
+// useSkill hands the model a skill's instructions. The UI is told only which
+// skill was loaded.
+func (t *turn) useSkill(raw json.RawMessage) (outcome, error) {
+	var args struct{ Name string }
+	if err := parseArgs(raw, &args); err != nil {
+		return outcome{}, err
+	}
+	name := strings.TrimSpace(args.Name)
+	var enabled []string
+	for _, sk := range t.skills {
+		if strings.EqualFold(sk.Name, name) {
+			return outcome{result: map[string]string{"name": sk.Name}, output: sk.Instructions}, nil
+		}
+		enabled = append(enabled, sk.Name)
+	}
+	return outcome{}, failTool("There is no enabled skill called %q. The enabled skills are: %s.", name, strings.Join(enabled, ", "))
 }
 
 // ---------------- ask_user ----------------

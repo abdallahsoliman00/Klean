@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createArtifactsSlice } from './artifacts';
+import { createAttachmentsSlice } from './attachments';
 import { createChatsSlice } from './chats';
 import { createDialogSlice } from './dialogs';
 import { createPreferencesSlice } from './preferences';
@@ -16,6 +17,7 @@ export const useStore = create<Store>()((...a) => ({
   ...createProvidersSlice(...a),
   ...createPresetsSlice(...a),
   ...createChatsSlice(...a),
+  ...createAttachmentsSlice(...a),
   ...createArtifactsSlice(...a),
   ...createSendSlice(...a),
 }));

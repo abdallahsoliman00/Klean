@@ -20,18 +20,19 @@
 - [x] Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available. (Five schemes, each light and dark, in Settings → Appearance.)
 - [] Give the user the option to select from different code coloschemes as well.
 - [] Favourite chats.
-- [] Allow for multiple system prompts. (Save system prompts to database where all you do is load the system prompt and reuse it.)
+- [x] Allow for multiple system prompts. (Save system prompts to database where all you do is load the system prompt and reuse it.)
 - [] Make the application download the most recent version of the tool if one is available.
 - [x] Possibly migrate the backend to Rust or Go while it's still small to make cross-compilation to other languages easier than Python.
-- [] Add using images. The responses API now supports this.
+- [x] Add using images. The responses API now supports this.
 - [x] Also migrate from the completions, and ensure the OpenAI SDK is used.
-- [] If responses endpoint doesn't exist fallback to completions.
+- [x] If responses endpoint doesn't exist fallback to completions.
 - [] Add file uploads
 - [] Add file creation (not just markdown files)
 - [x] Embed the frontend in the executable.
 - [] Make a tree where you can wander off on tangents and come back.
-- [] Add Skills and MCPs
-- [] Use either https://github.com/eKoopmans/html2pdf.js or https://github.com/SanzarRehman/HTML2PDF for html to pdf rendering for downloading.
+- [x] Add Skills
+- [] Add MCPs
+- [x] Use either https://github.com/eKoopmans/html2pdf.js or https://github.com/SanzarRehman/HTML2PDF for html to pdf rendering for downloading.
 
 # Repo Admin
 - [x] Change the name to something more interesting than switchboard. (Now Klean.)

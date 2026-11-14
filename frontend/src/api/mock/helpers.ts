@@ -1,4 +1,5 @@
 import type { Message, ToolPart } from '../../types';
+import { ARTIFACT_CREATE_TOOLS } from '../../config';
 import { artifacts } from './data';
 
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -11,7 +12,7 @@ export function* toolParts(messages: Message[]): Generator<{ m: Message; p: Tool
 /** Editing or regenerating also removes the artifacts those messages created. */
 export function dropArtifacts(msgs: Message[]) {
   for (const { p } of toolParts(msgs)) {
-    if (p.name !== 'create_artifact' || !p.result) continue;
+    if (!ARTIFACT_CREATE_TOOLS.includes(p.name) || !p.result) continue;
     const i = artifacts.findIndex((a) => a.id === p.result!.artifactId);
     if (i > -1) artifacts.splice(i, 1);
   }

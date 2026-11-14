@@ -1,0 +1,34 @@
+/* Settings: skills list, empty state, drop target and editor */
+.skills{position:relative;min-height:100%;max-width:560px}
+.skills-intro{margin:0 0 12px;font-size:12.5px;color:var(--faint);line-height:1.45}
+.skills-hint{margin:12px 2px 0;font-size:12.5px;color:var(--faint)}
+.skill-list{list-style:none;margin:0;padding:4px;border:1px solid var(--line);border-radius:12px;display:grid;gap:2px}
+.skill-row{display:flex;align-items:stretch;border-radius:9px;transition:background .12s}
+.skill-row:hover{background:var(--line-soft)}
+.skill-open{flex:1;min-width:0;text-align:left;padding:9px 10px;border-radius:9px;display:grid;gap:2px;line-height:1.4}
+.skill-open b{font-family:var(--mono);font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skill-open span{font-size:12.5px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.skill-row.off .skill-open b{color:var(--muted)}
+.skill-row.off .skill-open span{color:var(--faint)}
+.skill-switch{flex-shrink:0;display:grid;place-items:center;padding:0 12px;border-radius:9px}
+.skill-switch .switch{margin:0}
+.skills-empty{max-width:440px;padding:26px 2px 0}
+.skills-empty h3{font-family:var(--prose);font-weight:400;font-size:24px;letter-spacing:-.01em;line-height:1.25;margin:0 0 8px}
+.skills-empty p{margin:0 0 10px;color:var(--muted);line-height:1.55}
+.skills-empty p.faint{color:var(--faint);font-size:12.5px}
+.skills-drop{position:absolute;inset:-8px;z-index:1;display:flex;align-items:center;justify-content:center;gap:9px;border:2px dashed var(--accent);border-radius:14px;background:color-mix(in srgb,var(--raised) 88%,transparent);font-weight:500;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s,visibility .15s}
+.skills-drop svg{color:var(--accent)}
+.skills.dropping .skills-drop{opacity:1;visibility:visible}
+/* editor */
+.skill-form .field{max-width:560px}
+.skill-form .field:last-of-type{margin-bottom:0}
+.skill-form .field .sub{margin:7px 0 0}
+.skill-form .sub.problem{color:var(--danger)}
+.skill-form label{display:flex;align-items:baseline;justify-content:space-between}
+.skill-form label .count{font-weight:400;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.skill-form [aria-invalid="true"]{border-color:var(--danger)}
+.skill-form [aria-invalid="true"]:focus{box-shadow:0 0 0 3px var(--danger-soft)}
+.skill-form .mono{font-family:var(--mono);font-size:13px}
+.skill-form .textarea.short{min-height:0}
+.skill-form .textarea.tall{min-height:220px;line-height:1.6;tab-size:2}
+.skill-source{margin:0 0 18px;padding:9px 12px;border-radius:10px;background:var(--accent-soft);color:var(--ink);font-size:13px;max-width:560px}

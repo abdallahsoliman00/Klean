@@ -17,7 +17,9 @@
 @import '../components/Settings/Appearance.css';
 @import '../components/Thread/Welcome.css';
 @import '../components/Composer/Composer.css';
+@import '../components/Images/Images.css';
 @import '../components/Palette/Palette.css';
 @import '../components/ChatPanel/ChatPanel.css';
 @import '../components/Settings/Settings.css';
+@import '../components/Settings/Skills.css';
 @import '../components/common/common.css';

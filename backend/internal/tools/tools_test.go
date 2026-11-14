@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 
@@ -163,15 +164,48 @@ func TestSearchProviders(t *testing.T) {
 }
 
 func TestDefsAndGuidance(t *testing.T) {
-	if n := len(Defs(AllGroups)); n != 5 {
+	if n := len(Defs(AllGroups)); n != 6 {
 		t.Fatalf("%d tools", n)
 	}
 	if Defs(nil) != nil || Guidance(nil) != "" {
 		t.Fatal("no groups should mean no tools and no guidance")
 	}
-	for _, d := range Defs(AllGroups) {
+	for _, d := range append(Defs(AllGroups), SkillDef) {
 		if d.Description == "" || d.Parameters["type"] != "object" {
 			t.Errorf("%s: incomplete definition", d.Name)
+		}
+	}
+}
+
+// A report is only made through create_report: the generic tool doesn't offer the kind.
+func TestReportHasItsOwnTool(t *testing.T) {
+	var names []string
+	for _, d := range Defs([]string{GroupArtifacts}) {
+		names = append(names, d.Name)
+		if d.Name != CreateArtifact {
+			continue
+		}
+		kinds := d.Parameters["properties"].(obj)["kind"].(obj)["enum"].([]string)
+		if slices.Contains(kinds, KindReport) {
+			t.Fatalf("create_artifact offers the report kind: %v", kinds)
+		}
+	}
+	if got := strings.Join(names, ","); got != "create_artifact,create_report,update_artifact" {
+		t.Fatalf("artifact tools: %s", got)
+	}
+	if g := Guidance([]string{GroupArtifacts}); !strings.Contains(g, CreateReport) || !strings.Contains(g, "A4") {
+		t.Fatalf("guidance doesn't cover reports: %q", g)
+	}
+}
+
+func TestSkillGuidance(t *testing.T) {
+	if SkillGuidance(nil) != "" {
+		t.Fatal("guidance without skills")
+	}
+	g := SkillGuidance([]Skill{{"weekly-report", "Use for the weekly status report."}, {"tone", "How to write to customers."}})
+	for _, want := range []string{UseSkill, "\n- weekly-report: Use for the weekly status report.", "\n- tone: How to write to customers."} {
+		if !strings.Contains(g, want) {
+			t.Errorf("guidance lacks %q: %q", want, g)
 		}
 	}
 }

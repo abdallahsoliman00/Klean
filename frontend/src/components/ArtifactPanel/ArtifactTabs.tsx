@@ -7,7 +7,7 @@ const TABS: { id: ArtifactTab; label: string }[] = [
   { id: 'code', label: 'Code' },
 ];
 
-/** Preview / Code. Arrow keys switch between them. Hidden for code artifacts, which only have code. */
+/** Preview / Code. Arrow keys switch between them. Hidden for artifacts with one view: code (only code) and reports (only pages). */
 export function ArtifactTabs({ tab, hidden }: { tab: ArtifactTab; hidden: boolean }) {
   const setTab = useStore((s) => s.setArtifactTab);
   const ref = useRef<HTMLDivElement>(null);

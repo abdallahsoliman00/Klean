@@ -18,11 +18,14 @@ import (
 )
 
 type sendBody struct {
-	Content       string `json:"content"`
-	ProviderID    string `json:"providerId"`
-	Model         string `json:"model"`
-	EditMessageID string `json:"editMessageId"`
-	Regenerate    bool   `json:"regenerate"`
+	Content    string `json:"content"`
+	ProviderID string `json:"providerId"`
+	Model      string `json:"model"`
+	// Images are attached to a new message. An edit keeps the images the
+	// message had and ignores these.
+	Images        []imageBody `json:"images"`
+	EditMessageID string      `json:"editMessageId"`
+	Regenerate    bool        `json:"regenerate"`
 	// Tools lists the enabled tool groups. Omitted means all of them; an
 	// empty list sends no tools to the provider.
 	Tools *[]string `json:"tools"`
@@ -45,7 +48,7 @@ type prepared struct {
 	history  []prompt.Turn // the whole chat; trimmed to the window per request
 	window   int
 	reserved int            // tokens the tool definitions take
-	groups   []string       // enabled tool groups
+	skills   []*store.Skill // the enabled skills, which use_skill may load
 	userMsg  *store.Message // nil when regenerating or answering
 	answered *answered      // set when the request answered a question
 	title    *string        // set when this message named the chat
@@ -83,7 +86,17 @@ func (s *Server) prepareSend(chatID string, body sendBody) (*prepared, error) {
 		return nil, errorf(http.StatusBadRequest, "That provider no longer exists. Pick another model.")
 	}
 
-	out := &prepared{groups: groups, window: chat.ContextWindow}
+	skills, err := s.enabledSkills()
+	if err != nil {
+		return nil, err
+	}
+	// use_skill doesn't belong to a group: it is offered whenever there are skills.
+	defs := tools.Defs(groups)
+	if len(skills) > 0 {
+		defs = append(defs, tools.SkillDef)
+	}
+
+	out := &prepared{skills: skills, window: chat.ContextWindow}
 	if body.Answer != nil {
 		if out.answered, err = s.answerQuestion(chatID, body.Answer.CallID, body.Answer.Text); err != nil {
 			return nil, err
@@ -111,16 +124,19 @@ func (s *Server) prepareSend(chatID string, body sendBody) (*prepared, error) {
 	if len(history) == 0 || (out.answered == nil && history[len(history)-1].Role != "user") {
 		return nil, errorf(http.StatusConflict, "There's no message to answer.")
 	}
-	out.history = historyTurns(history, len(groups) > 0)
+	imageData, err := s.db.ChatImageData(chatID)
+	if err != nil {
+		return nil, err
+	}
+	out.history = historyTurns(history, len(defs) > 0, imageData)
 
-	defs := tools.Defs(groups)
 	if len(defs) > 0 {
 		schema, _ := json.Marshal(defs)
 		out.reserved = prompt.EstimateTokens(string(schema))
 	}
 	out.req = llm.Request{
 		BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: body.Model,
-		Instructions: withGuidance(chat.SystemPrompt, tools.Guidance(groups)),
+		Instructions: withGuidance(withGuidance(chat.SystemPrompt, tools.Guidance(groups)), tools.SkillGuidance(skillInfo(skills))),
 		Temperature:  chat.Temperature,
 		Tools:        defs,
 	}
@@ -137,31 +153,46 @@ func withGuidance(systemPrompt, guidance string) string {
 // addUserMessage applies an edit or regenerate, closes a question the user
 // chose not to answer, and saves the new message (nil when regenerating).
 func (s *Server) addUserMessage(chatID string, body sendBody) (*store.Message, error) {
-	content := strings.TrimSpace(body.Content)
-	if !body.Regenerate && content == "" {
-		return nil, errorf(http.StatusUnprocessableEntity, "Message is empty.")
-	}
-	if body.EditMessageID != "" {
-		found, err := s.db.TruncateFrom(chatID, body.EditMessageID)
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			return nil, errorf(http.StatusNotFound, "The message being edited was not found.")
-		}
-	}
 	if body.Regenerate {
 		if err := s.db.DropTrailingAssistant(chatID); err != nil {
 			return nil, err
 		}
+		return nil, s.skipPendingQuestions(chatID)
+	}
+	content := strings.TrimSpace(body.Content)
+	if body.EditMessageID != "" {
+		return s.editMessage(chatID, body.EditMessageID, content)
+	}
+	images, err := parseImages(body.Images)
+	if err != nil {
+		return nil, err
+	}
+	if content == "" && len(images) == 0 {
+		return nil, errEmptyMessage
 	}
 	if err := s.skipPendingQuestions(chatID); err != nil {
 		return nil, err
 	}
-	if body.Regenerate {
-		return nil, nil
+	return s.db.AddUserMessage(chatID, content, images)
+}
+
+var errEmptyMessage = errorf(http.StatusUnprocessableEntity, "Message is empty.")
+
+// editMessage replaces a message and everything after it with new text. The
+// message keeps its images, so the text may be empty when it has some.
+func (s *Server) editMessage(chatID, messageID, content string) (*store.Message, error) {
+	kept, err := s.db.MessageImages(messageID)
+	if err != nil {
+		return nil, err
 	}
-	return s.db.AddMessage(chatID, "user", content, "", false, nil)
+	if content == "" && len(kept) == 0 {
+		return nil, errEmptyMessage
+	}
+	msg, err := s.db.ReplaceFrom(chatID, messageID, content)
+	if err != nil || msg == nil {
+		return nil, orNotFound(err, "The message being edited was not found.")
+	}
+	return msg, s.skipPendingQuestions(chatID)
 }
 
 const skippedOutput = "The user did not answer this question and sent a new message instead."
@@ -228,11 +259,12 @@ func (s *Server) skipPendingQuestions(chatID string) error {
 // calls becomes its text and calls in the order they happened. Without tools
 // in the request the calls are left out and only the text is sent, so a chat
 // can carry on with a model or provider that has no tool support.
-func historyTurns(history []*store.Message, withCalls bool) []prompt.Turn {
+// imageData holds the bytes of the chat's images by image id.
+func historyTurns(history []*store.Message, withCalls bool, imageData map[string][]byte) []prompt.Turn {
 	var turns []prompt.Turn
 	for _, m := range history {
 		if len(m.Parts) == 0 {
-			turns = append(turns, prompt.Turn{Role: m.Role, Content: m.Content})
+			turns = append(turns, prompt.Turn{Role: m.Role, Content: m.Content, Images: turnImages(m.Images, imageData)})
 			continue
 		}
 		for _, p := range m.Parts {
@@ -269,7 +301,7 @@ func callTurn(p store.Part) prompt.Turn {
 func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	chatID := r.PathValue("id")
 	var body sendBody
-	if err := decode(r, &body); err != nil {
+	if err := decodeLimit(r, &body, config.MaxMessageBody); err != nil {
 		reply(w, 0, nil, err)
 		return
 	}
@@ -300,7 +332,7 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	if prep.answered != nil {
 		send("answered", prep.answered)
 	}
-	t := &turn{s: s, chatID: chatID, groups: prep.groups, send: send, started: map[string]bool{}}
+	t := &turn{s: s, chatID: chatID, tools: prep.req.Tools, skills: prep.skills, send: send, started: map[string]bool{}}
 	err = t.run(r.Context(), prep)
 	t.flushText()
 
@@ -340,7 +372,8 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 type turn struct {
 	s       *Server
 	chatID  string
-	groups  []string
+	tools   []llm.Tool     // the tools this request offered
+	skills  []*store.Skill // the enabled skills
 	send    func(event string, data any)
 	parts   []store.Part    // finished parts, in order
 	text    strings.Builder // text streamed since the last finished part

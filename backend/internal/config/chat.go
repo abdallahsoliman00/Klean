@@ -8,6 +8,10 @@ const (
 	DefaultTemperature   = 0.7
 	DefaultChatTitle     = "New chat"
 
+	// ImageChatTitle is the provisional title of a chat whose first message
+	// is images without text.
+	ImageChatTitle = "Image"
+
 	// AutoTitleChars is how much of the first message becomes the chat title.
 	AutoTitleChars = 42
 )
@@ -28,6 +32,9 @@ const (
 	ReplyShare         = 0.25 // part of the window kept free for the model's answer
 	PerMessageOverhead = 4    // tokens each message costs beyond its text
 	CharsPerToken      = 4    // rough, model-agnostic
+	// ImageTokens is what one attached image is counted as. Providers charge
+	// by size and detail; this is a middling figure for a photo.
+	ImageTokens = 1000
 )
 
 // The database.

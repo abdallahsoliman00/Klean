@@ -15,8 +15,18 @@ import (
 type Turn struct {
 	Role    string // "user" or "assistant"
 	Content string
+	Images  []Image // attached to a user message
 	Call    *Call
 }
+
+// Image is a picture sent to the model with a user message.
+type Image struct {
+	MediaType string // image/png, image/jpeg...
+	Data      string // base64
+}
+
+// DataURL is the image as a data: URL, the form both provider APIs take.
+func (i Image) DataURL() string { return "data:" + i.MediaType + ";base64," + i.Data }
 
 // Call is a finished tool call.
 type Call struct {
@@ -47,7 +57,7 @@ func cost(t Turn) int {
 		return EstimateTokens(t.Call.Name) + EstimateTokens(t.Call.Arguments) +
 			EstimateTokens(t.Call.Output) + 2*config.PerMessageOverhead
 	}
-	return EstimateTokens(t.Content) + config.PerMessageOverhead
+	return EstimateTokens(t.Content) + len(t.Images)*config.ImageTokens + config.PerMessageOverhead
 }
 
 // Build picks the newest messages until the budget is used. The system prompt
@@ -69,7 +79,7 @@ func BuildReserving(systemPrompt string, history []Turn, contextWindow, reserved
 	var picked []Turn
 	for i := len(history) - 1; i >= 0; i-- {
 		m := history[i]
-		if m.Call == nil && m.Content == "" {
+		if m.Call == nil && m.Content == "" && len(m.Images) == 0 {
 			continue
 		}
 		c := cost(m)
@@ -119,8 +129,12 @@ func CleanTitle(raw string) string {
 }
 
 // MakeTitle turns the first message into a short chat title.
+// A message without text (images only) gets config.ImageChatTitle.
 func MakeTitle(text string) string {
 	t := strings.Join(strings.Fields(text), " ")
+	if t == "" {
+		return config.ImageChatTitle
+	}
 	short := clip(t, config.AutoTitleChars)
 	if short == t {
 		return t

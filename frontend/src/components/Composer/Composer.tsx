@@ -1,28 +1,36 @@
-import { COMPOSER_MAX_HEIGHT_PX } from '../../config';
+import { useRef } from 'react';
+import { COMPOSER_MAX_HEIGHT_PX, IMAGE_TYPES } from '../../config';
 import { useAutosize } from '../../hooks/useAutosize';
 import { composerInput } from '../../lib/focus';
+import { dataUrl } from '../../lib/images';
 import { getStore, useStore } from '../../store';
-import { ArrowDownIcon } from '../common/icons';
+import { ArrowDownIcon, ImageIcon } from '../common/icons';
+import { ImageStrip } from '../Images/ImageStrip';
 import { SendButton } from './SendButton';
 import { SystemPromptChip } from './SystemPromptChip';
 import { ToolsChip } from './ToolsChip';
 
-/** The message box at the bottom. Enter sends, Shift+Enter adds a line; while a reply streams, the button stops it. */
+/** The message box at the bottom. Enter sends, Shift+Enter adds a line; while a reply streams, the button stops it.
+    Images are attached with the button, by pasting, or by dropping files anywhere on the app. */
 export function Composer({ showJump, onJump }: { showJump: boolean; onJump: () => void }) {
   const text = useStore((s) => s.composerText);
   const setText = useStore((s) => s.setComposerText);
   const model = useStore((s) => s.sel.model);
   const streaming = useStore((s) => !!s.streaming);
-  const { send, stop } = getStore();
+  const attachments = useStore((s) => s.attachments);
+  const attaching = useStore((s) => s.attaching);
+  const { send, stop, attachFiles, removeAttachment, setAttachments } = getStore();
+  const picker = useRef<HTMLInputElement>(null);
   useAutosize(composerInput, text, COMPOSER_MAX_HEIGHT_PX);
+  const ready = !!model && !attaching && (!!text.trim() || attachments.length > 0);
 
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (streaming) return stop();
-    const v = text.trim();
-    if (!v || !model) return;
+    if (!ready) return;
     setText('');
-    send({ content: v });
+    setAttachments([]);
+    send({ content: text.trim(), images: attachments.map(({ mediaType, data }) => ({ mediaType, data })) });
   };
 
   return (
@@ -36,6 +44,9 @@ export function Composer({ showJump, onJump }: { showJump: boolean; onJump: () =
           <label className="sr" htmlFor="input">
             Message
           </label>
+          {(attachments.length > 0 || attaching > 0) && (
+            <ImageStrip images={attachments.map((a) => ({ src: dataUrl(a), remove: () => removeAttachment(a.id) }))} busy={attaching} />
+          )}
           <textarea
             id="input"
             ref={composerInput}
@@ -44,6 +55,11 @@ export function Composer({ showJump, onJump }: { showJump: boolean; onJump: () =
             placeholder={model ? `Message ${model}` : 'Choose a model to start'}
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onPaste={(e) => {
+              if (!e.clipboardData.files.length) return; // text pastes as usual
+              e.preventDefault();
+              void attachFiles(e.clipboardData.files);
+            }}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
               e.preventDefault();
@@ -53,7 +69,23 @@ export function Composer({ showJump, onJump }: { showJump: boolean; onJump: () =
           <div className="box-row">
             <SystemPromptChip />
             <ToolsChip />
-            <SendButton streaming={streaming} disabled={!streaming && (!text.trim() || !model)} />
+            <button type="button" className="chip attach" aria-label="Attach images" title="Attach images (or paste, or drop them here)" onClick={() => picker.current?.click()}>
+              <ImageIcon />
+              <span>Image</span>
+            </button>
+            <input
+              ref={picker}
+              type="file"
+              hidden
+              multiple
+              accept={IMAGE_TYPES.join(',')}
+              onChange={(e) => {
+                void attachFiles(e.target.files ?? []);
+                e.target.value = ''; // so the same file can be picked again
+                composerInput.current?.focus();
+              }}
+            />
+            <SendButton streaming={streaming} disabled={!streaming && !ready} />
           </div>
         </form>
         <div className="hint">Enter sends, Shift+Enter adds a line, Ctrl+K switches model</div>

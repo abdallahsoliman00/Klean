@@ -31,6 +31,7 @@ export interface ToolArgs {
   question?: string;
   multiple?: boolean;
   options?: { label: string; description?: string }[];
+  name?: string;
 }
 
 export interface SearchResult {
@@ -51,6 +52,7 @@ export interface ToolResult {
   language?: string;
   version?: number;
   answer?: string;
+  name?: string;
 }
 
 export interface TextPart {
@@ -72,10 +74,25 @@ export interface ToolPart {
 
 export type Part = TextPart | ToolPart;
 
+/** An image as it is uploaded with a message: base64 without the "data:" prefix. */
+export interface ImageInput {
+  mediaType: string;
+  data: string;
+}
+
+/** An image a message carries. Its bytes are at GET /images/:id. */
+export interface MessageImage {
+  id: string;
+  mediaType: string;
+  /** Client-only: the local copy, shown until the server's has loaded. */
+  url?: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  images?: MessageImage[] | null;
   parts?: Part[] | null;
   model?: string | null;
   stopped?: boolean;
@@ -103,6 +120,17 @@ export interface Preset extends ChatConfig {
 }
 
 export type PresetInput = Omit<Preset, 'id'>;
+
+/** Reusable instructions the assistant loads when a task calls for them (the shape of a SKILL.md file). */
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  enabled: boolean;
+}
+
+export type SkillInput = Omit<Skill, 'id' | 'enabled'> & { enabled?: boolean };
 
 export interface ChatSummary extends Partial<ChatSettings> {
   id: string;
@@ -162,6 +190,7 @@ export interface SettingsPatch extends SearchSettingsPatch {
 /** Body of POST /chats/:id/messages. */
 export interface SendBody {
   content: string;
+  images?: ImageInput[];
   providerId: string | null;
   model: string | null;
   editMessageId?: string;
@@ -219,4 +248,12 @@ export interface Api {
     get(): Promise<AppSettings>;
     update(patch: SettingsPatch): Promise<AppSettings>;
   };
+  skills: {
+    list(): Promise<Skill[]>;
+    create(data: SkillInput): Promise<Skill>;
+    update(id: string, patch: Partial<SkillInput>): Promise<Skill>;
+    remove(id: string): Promise<void>;
+  };
+  /** Where an image's bytes are, for an <img>. */
+  imageUrl(id: string): string;
 }

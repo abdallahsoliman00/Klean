@@ -37,6 +37,9 @@ export function SettingsNav() {
       <button className={item({ kind: 'search' })} onClick={() => setPage({ kind: 'search' })}>
         Web search
       </button>
+      <button className={item({ kind: 'skills' })} onClick={() => setPage({ kind: 'skills' })}>
+        Skills
+      </button>
     </div>
   );
 }

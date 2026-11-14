@@ -8,7 +8,7 @@ import type { Slice } from './types';
 export type Overlay = 'palette' | 'chatPanel' | 'settings';
 
 /** What the settings modal shows: a provider (id null = "Add a provider"), or an app page. */
-export type SettingsPage = { kind: 'provider'; id: string | null } | { kind: 'appearance' } | { kind: 'search' };
+export type SettingsPage = { kind: 'provider'; id: string | null } | { kind: 'appearance' } | { kind: 'search' } | { kind: 'skills' };
 
 export interface MenuItem {
   label: string;
@@ -25,6 +25,8 @@ export interface UiSlice {
   /** The open popover (artifact switcher, tools menu) and the button that opened it. */
   popover: { id: string; anchor: HTMLElement } | null;
   menu: { x: number; y: number; items: MenuItem[] } | null;
+  /** The image shown large, over everything. */
+  lightbox: { src: string; label: string } | null;
 
   showOverlay(o: Overlay): void;
   hideAll(): void;
@@ -39,6 +41,8 @@ export interface UiSlice {
   closePopover(refocus?: boolean): void;
   showMenu(anchor: HTMLElement, items: MenuItem[]): void;
   hideMenu(): void;
+  showImage(src: string, label: string): void;
+  closeLightbox(): void;
 }
 
 export const createUiSlice: Slice<UiSlice> = (set, get) => ({
@@ -48,6 +52,7 @@ export const createUiSlice: Slice<UiSlice> = (set, get) => ({
   settingsPage: { kind: 'provider', id: null },
   popover: null,
   menu: null,
+  lightbox: null,
 
   showOverlay(overlay) {
     get().hideMenu();
@@ -113,5 +118,12 @@ export const createUiSlice: Slice<UiSlice> = (set, get) => ({
   },
   hideMenu() {
     if (get().menu) set({ menu: null });
+  },
+
+  showImage(src, label) {
+    set({ lightbox: { src, label } });
+  },
+  closeLightbox() {
+    set({ lightbox: null });
   },
 });

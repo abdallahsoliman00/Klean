@@ -27,4 +27,5 @@
 @media (max-width:820px){
   .composer-dock{padding:0 12px 12px}
   .hint{display:none}
+  .chip.attach span{display:none} /* the icon alone, so the row stays on one line */
 }

@@ -1,11 +1,13 @@
 import { ART_CLEAR_MS, SVG_PREVIEW_HEAD } from '../../config';
 import { useLingering } from '../../hooks/useLingering';
+import { isReport } from '../../lib/artifacts';
 import { useStore } from '../../store';
 import { artifactPanelOpen } from '../../store/selectors';
 import type { ArtifactTab } from '../../store/artifacts';
 import type { Artifact } from '../../types';
 import { Prose } from '../Parts/Prose';
 import { CodeView } from './CodeView';
+import { ReportView } from './ReportView';
 import { SandboxFrame } from './SandboxFrame';
 
 /** The artifact itself. It is emptied once the panel has slid shut, so a closed preview stops running. */
@@ -25,6 +27,7 @@ export function ArtifactView({ artifact: a, tab }: { artifact?: Artifact; tab: A
 function Preview({ artifact: a }: { artifact: Artifact }) {
   const body = a.content || '';
   const title = a.title || 'Preview';
+  if (isReport(a)) return <ReportView html={body} title={title} />;
   if (a.kind === 'html') return <SandboxFrame doc={body} title={title} />;
   if (a.kind === 'svg') return <SandboxFrame doc={SVG_PREVIEW_HEAD + body} title={title} />;
   if (a.kind === 'markdown')

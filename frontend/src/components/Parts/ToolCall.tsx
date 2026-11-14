@@ -1,6 +1,6 @@
 import { domainOf } from '../../lib/urls';
 import type { ToolPart } from '../../types';
-import { AlertIcon, CheckIcon, SpinnerIcon } from '../common/icons';
+import { AlertIcon, CheckIcon, SkillIcon, SpinnerIcon } from '../common/icons';
 import { ArtifactCard } from './ArtifactCard';
 import { AskCard } from './AskCard';
 import { FetchCall } from './FetchCall';
@@ -11,6 +11,8 @@ const FAILURES: Record<string, string> = {
   web_search: 'The web search failed',
   create_artifact: 'Couldn’t create the artifact',
   update_artifact: 'Couldn’t update the artifact',
+  create_report: 'Couldn’t write the report',
+  use_skill: 'Couldn’t load the skill',
   ask_user: 'Couldn’t ask the question',
 };
 
@@ -25,7 +27,19 @@ export function ToolCall({ part: p }: { part: ToolPart }) {
       return <FetchCall part={p} running={running} />;
     case 'create_artifact':
     case 'update_artifact':
+    case 'create_report':
       return <ArtifactCard part={p} running={running} />;
+    case 'use_skill': {
+      const name = p.result?.name || p.args?.name;
+      return (
+        <ToolRow icon={running ? <SpinnerIcon /> : <SkillIcon />}>
+          <span className="t-text">
+            {running ? 'Loading skill' : 'Used skill'} {name ? <code>{name}</code> : ''}
+            {running ? '…' : ''}
+          </span>
+        </ToolRow>
+      );
+    }
     case 'ask_user':
       return running ? (
         <ToolRow icon={<SpinnerIcon />}>

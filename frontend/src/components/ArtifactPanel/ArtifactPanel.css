@@ -36,6 +36,16 @@
 .art-doc{padding:28px 32px 40px;max-width:720px;margin:0 auto}
 .art-code{margin:0;padding:16px 18px 28px;font-family:var(--mono);font-size:12.5px;line-height:1.65;width:max-content;min-width:100%;box-sizing:border-box;tab-size:2}
 .art-code code{font:inherit}
+/* a report: A4 sheets on the panel's backdrop, scaled by --fit (hooks/useFit) */
+.art-view:has(.report){background:var(--bg);border-color:transparent;border-radius:0;margin:0}
+.art-scroll.report{--fit:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:6px 0 28px;outline-offset:-2px}
+.sheet{margin:0;display:grid;justify-items:center;gap:8px;opacity:0;transition:opacity .25s}
+.sheet.ready{opacity:1}
+.sheet-page{position:relative;width:calc(var(--page-w)*var(--fit));height:calc(var(--page-h)*var(--fit));background:#fff;border-radius:2px;box-shadow:0 0 0 1px var(--line),0 10px 28px -14px rgba(0,0,0,.35);overflow:hidden}
+.sheet-clip{position:absolute;left:calc(var(--page-m)*var(--fit));top:calc(var(--page-m)*var(--fit));width:calc(var(--content-w)*var(--fit) + 1px);height:calc(var(--content-h)*var(--fit));overflow:hidden} /* +1px: a hairline on the right edge survives rounding */
+.art-view .sheet-clip iframe{position:absolute;left:0;top:0;flex:none;width:var(--content-w);transform-origin:0 0;background:#fff}
+.sheet figcaption{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.art-bar .btn.small svg{flex-shrink:0}
 .art-empty{margin:auto;padding:28px;text-align:center;color:var(--faint);line-height:1.5}
 @media (max-width:1100px){
   /* not enough room for three columns: the artifact panel slides over the thread instead */
