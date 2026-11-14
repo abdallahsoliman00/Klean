@@ -8,8 +8,8 @@
 // When the request offers tools, a trigger word in the last user message
 // makes it call one: /artifact, /code, /svg, /update, /ask, /search, /fetch
 // (see triggers below). Once the call's output comes back it answers in text.
-// /loop calls a tool on every request and never finishes, NOTOOLS rejects any
-// request that carries tools with a 400.
+// /loop and /webloop call a tool on every request and never finish, NOTOOLS
+// rejects any request that carries tools with a 400.
 package fakeprovider
 
 import (
@@ -174,10 +174,17 @@ var triggers = []struct {
 	{"/search", "web_search", func(in input) map[string]any {
 		return map[string]any{"query": after(in.lastUser, "/search", "klean chat ui")}
 	}},
+	{"/webloop", "web_search", func(input) map[string]any {
+		return map[string]any{"query": "loop"}
+	}},
 	{"/loop", "create_artifact", func(in input) map[string]any {
 		return map[string]any{"title": "Loop", "kind": "markdown", "content": fmt.Sprintf("Request with %d input items.", in.count)}
 	}},
 }
+
+// repeatTriggers keep calling on every request instead of answering once
+// their output comes back.
+var repeatTriggers = map[string]bool{"/loop": true, "/webloop": true}
 
 // pickCall decides whether this request should be answered with a tool call.
 func pickCall(in input, offered map[string]bool) *call {
@@ -186,7 +193,7 @@ func pickCall(in input, offered map[string]bool) *call {
 			continue
 		}
 		// The call was already made and its output is here: answer in text.
-		if in.answered && t.word != "/loop" {
+		if in.answered && !repeatTriggers[t.word] {
 			return nil
 		}
 		return &call{t.tool, t.args(in)}

@@ -22,4 +22,8 @@ const (
 	// model calls tools, they run and the model is asked again, so a model
 	// that keeps calling tools stops here.
 	MaxToolRounds = 8
+
+	// MaxWebSearchToolRounds is the round limit for a reply that reaches the
+	// web: searching and reading pages takes more requests than other tools.
+	MaxWebSearchToolRounds = 20
 )

@@ -37,6 +37,9 @@ func ValidGroup(g string) bool {
 	return g == GroupArtifacts || g == GroupAsk || g == GroupWeb
 }
 
+// IsWeb reports whether name is one of the tools that reach the web.
+func IsWeb(name string) bool { return name == WebSearch || name == FetchPage }
+
 type obj = map[string]any
 
 func str(desc string) obj { return obj{"type": "string", "description": desc} }

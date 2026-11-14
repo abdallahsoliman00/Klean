@@ -569,6 +569,33 @@ func TestToolRoundCap(t *testing.T) {
 	}
 }
 
+// A reply that reaches the web gets the larger round limit.
+func TestWebToolRoundCap(t *testing.T) {
+	web, _ := webStub(t)
+	e := setupTools(t, server.WithWeb(web))
+	ev := e.say("/webloop forever", nil)
+	last := ev[len(ev)-1]
+	if last.name != "done" {
+		t.Fatalf("ended with %s: %v", last.name, last.data)
+	}
+	if n := len(e.fake.Requests()); n != config.MaxWebSearchToolRounds {
+		t.Fatalf("%d requests to the provider, want %d", n, config.MaxWebSearchToolRounds)
+	}
+	msg := last.data["message"].(map[string]any)
+	if !strings.Contains(msg["content"].(string), fmt.Sprintf("after %d rounds", config.MaxWebSearchToolRounds)) {
+		t.Fatalf("message: %v", msg["content"])
+	}
+	calls := 0
+	for _, p := range as[[]part](t, msg["parts"]) {
+		if p.Type == "tool" && p.Status == "done" {
+			calls++
+		}
+	}
+	if calls != config.MaxWebSearchToolRounds {
+		t.Fatalf("%d calls, want %d", calls, config.MaxWebSearchToolRounds)
+	}
+}
+
 // Hanging up after a tool ran keeps the finished call in the saved reply.
 func TestStopMidTurnKeepsFinishedCalls(t *testing.T) {
 	e := setupTools(t)

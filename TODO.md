@@ -2,7 +2,7 @@
 - [] Make the chat name be a summary of the chat, not the message that was sent.
 - [] Settings don't take effect and system prompts get deleted.
 - [] When switching models in the middle of a conversation, find out which model is the one actually doing the talking.
-- [] If an agent loops for too long, it stops. Give it a longer loop time or make it adjustable through a config.
+- [x] If an agent loops for too long, it stops. Give it a longer loop time or make it adjustable through a config.
 - [] Make the artifacts side panel resizable and give it fullscreen.
 - [] Make it possible to run multiple chats in parallel. If I exit a chat without explicitly stopping token straming, then keep that running in the background where I can later enter and continue.
 

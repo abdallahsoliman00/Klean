@@ -379,6 +379,7 @@ func (t *turn) toolStart(id, name string) {
 // round limit. Whatever was produced is left in t, also when it fails.
 func (t *turn) run(ctx context.Context, prep *prepared) error {
 	var current []prompt.Turn // this reply so far, which is not in the database yet
+	maxRounds := config.MaxToolRounds
 	for round := 1; ; round++ {
 		req := prep.req
 		// Older history gives way as this reply's tool results grow.
@@ -391,6 +392,9 @@ func (t *turn) run(ctx context.Context, prep *prepared) error {
 		}
 		if len(calls) == 0 {
 			return nil
+		}
+		if anyWebCall(calls) {
+			maxRounds = config.MaxWebSearchToolRounds
 		}
 		if text := t.flushText(); text != "" {
 			current = append(current, prompt.Turn{Role: "assistant", Content: text})
@@ -407,9 +411,21 @@ func (t *turn) run(ctx context.Context, prep *prepared) error {
 		if t.asked {
 			return nil
 		}
-		if round >= config.MaxToolRounds {
-			t.token(fmt.Sprintf("\n\n*Stopped here: the model was still calling tools after %d rounds.*", config.MaxToolRounds))
+		if round >= maxRounds {
+			t.token(fmt.Sprintf("\n\n*Stopped here: the model was still calling tools after %d rounds.*", maxRounds))
 			return nil
 		}
 	}
+}
+
+// anyWebCall reports whether a round called a tool that reaches the web.
+// Such a reply gets the larger round limit: research takes several searches
+// and page reads before the model can answer.
+func anyWebCall(calls []llm.ToolCall) bool {
+	for _, c := range calls {
+		if tools.IsWeb(c.Name) {
+			return true
+		}
+	}
+	return false
 }
