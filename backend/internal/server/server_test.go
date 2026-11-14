@@ -92,7 +92,18 @@ func parseSSE(t *testing.T, r io.Reader) []event {
 	return out
 }
 
+// send returns the reply's events. The `title` event that may follow `done`
+// is left out; sendAll returns it too.
 func (e *env) send(chatID string, body map[string]any) []event {
+	e.t.Helper()
+	ev := e.sendAll(chatID, body)
+	if n := len(ev); n > 0 && ev[n-1].name == "title" {
+		return ev[:n-1]
+	}
+	return ev
+}
+
+func (e *env) sendAll(chatID string, body map[string]any) []event {
 	e.t.Helper()
 	b, _ := json.Marshal(body)
 	res, err := http.Post(e.api.URL+"/api/chats/"+chatID+"/messages", "application/json", bytes.NewReader(b))
@@ -249,7 +260,7 @@ func TestChatFlow(t *testing.T) {
 	send(map[string]any{"content": "second"})
 	var got chat
 	e.do("GET", "/chats/"+c.ID, nil, &got)
-	if roles := rolesOf(got.Messages); roles != "user,assistant,user,assistant" || got.Title != "hello there" {
+	if roles := rolesOf(got.Messages); roles != "user,assistant,user,assistant" || got.Title != "A short summary" {
 		t.Fatalf("after second: %s %q", roles, got.Title)
 	}
 	last, _ = e.fake.Last()
@@ -410,16 +421,18 @@ func TestValidation(t *testing.T) {
 
 // The frontend relies on these exact keys (it pushes onto chat.messages, so
 // "messages" must be [] for a new chat, never missing or null).
+// keys lists an object's keys in order.
+func keys(m map[string]any) string {
+	var ks []string
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	return strings.Join(ks, ",")
+}
+
 func TestResponseShapes(t *testing.T) {
 	e := setup(t)
-	keys := func(m map[string]any) string {
-		var ks []string
-		for k := range m {
-			ks = append(ks, k)
-		}
-		sort.Strings(ks)
-		return strings.Join(ks, ",")
-	}
 	const chatKeys = "contextWindow,createdAt,id,model,providerId,systemPrompt,temperature,title,updatedAt"
 
 	var created map[string]any

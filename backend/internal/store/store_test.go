@@ -102,3 +102,49 @@ func TestPartsRoundTrip(t *testing.T) {
 		t.Fatalf("artifacts outlived their chat: %+v", left)
 	}
 }
+
+func TestReplaceTitleKeepsARename(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	c, err := db.CreateChat(NewChat{Title: "provisional"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed, err := db.ReplaceTitle(c.ID, "provisional", "summary"); err != nil || !changed {
+		t.Fatalf("replace: %v %v", changed, err)
+	}
+	// The title is no longer the provisional one, as after a rename.
+	if changed, err := db.ReplaceTitle(c.ID, "provisional", "late summary"); err != nil || changed {
+		t.Fatalf("replaced a title that had changed: %v %v", changed, err)
+	}
+	if got, _ := db.GetChat(c.ID); got.Title != "summary" {
+		t.Fatalf("title: %q", got.Title)
+	}
+}
+
+func TestDeletingProviderClearsPresets(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	p, err := db.CreateProvider("P", "http://x", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := "m"
+	preset, err := db.CreatePreset("Mine", ChatConfig{ProviderID: &p.ID, Model: &model, Temperature: 1, ContextWindow: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DeleteProvider(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := db.GetPreset(preset.ID)
+	if err != nil || got.ProviderID != nil || got.Model == nil || *got.Model != "m" {
+		t.Fatalf("preset after provider delete: %+v %v", got, err)
+	}
+}

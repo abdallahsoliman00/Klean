@@ -1,10 +1,11 @@
 # Bugs and usage issues
-- [] Make the chat name be a summary of the chat, not the message that was sent.
-- [] Settings don't take effect and system prompts get deleted.
+- [x] Make the chat name be a summary of the chat, not the message that was sent.
+- [x] Add configurations where the user saves a group of temperature settings, model used, context window and system prompt, all together.
+- [x] Make the configuration sticky. i.e. let the configuration previously set be the same for the next chat.
+- [x] Make the artifacts side panel resizable and give it fullscreen.
+- [] Make it possible to run multiple chats in parallel. If I exit a chat without explicitly stopping token straming, then keep that running in the background where I can later enter and continue.
 - [] When switching models in the middle of a conversation, find out which model is the one actually doing the talking.
 - [x] If an agent loops for too long, it stops. Give it a longer loop time or make it adjustable through a config.
-- [] Make the artifacts side panel resizable and give it fullscreen.
-- [] Make it possible to run multiple chats in parallel. If I exit a chat without explicitly stopping token straming, then keep that running in the background where I can later enter and continue.
 
 # New features
 - [x] Make the context window larger than 128k tokens.

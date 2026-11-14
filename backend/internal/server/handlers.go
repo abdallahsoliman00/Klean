@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -276,12 +277,55 @@ func (s *Server) deleteArtifact(w http.ResponseWriter, r *http.Request) {
 const (
 	settingSearchProvider = "search_provider"
 	settingSearchKey      = "search_key"
+	settingChatDefaults   = "chat_defaults" // a store.ChatConfig as JSON
 )
 
 // settings is what the browser sees. The search key itself never leaves the server.
 type settings struct {
 	SearchProvider string `json:"searchProvider"`
 	HasSearchKey   bool   `json:"hasSearchKey"`
+	// ChatDefaults is the configuration used last, which the next new chat
+	// starts with. null until one was saved.
+	ChatDefaults *store.ChatConfig `json:"chatDefaults"`
+}
+
+// chatDefaults returns the saved configuration, or nil when there is none.
+// A provider deleted since it was saved is cleared, as it is on chats.
+func (s *Server) chatDefaults() (*store.ChatConfig, error) {
+	raw, err := s.db.Setting(settingChatDefaults)
+	if err != nil || raw == "" {
+		return nil, err
+	}
+	var c store.ChatConfig
+	if err := json.Unmarshal([]byte(raw), &c); err != nil {
+		return nil, fmt.Errorf("decoding chat defaults: %w", err)
+	}
+	if c.ProviderID != nil {
+		p, err := s.db.GetProvider(*c.ProviderID)
+		if err != nil {
+			return nil, err
+		}
+		if p == nil {
+			c.ProviderID = nil
+		}
+	}
+	return &c, nil
+}
+
+// saveChatDefaults stores the configuration; null forgets it.
+func (s *Server) saveChatDefaults(body opt[configBody]) error {
+	if body.Null {
+		return s.db.SetSetting(settingChatDefaults, "")
+	}
+	c, err := s.newConfig(body.V)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	return s.db.SetSetting(settingChatDefaults, string(raw))
 }
 
 // searchSettings returns the chosen search provider (DuckDuckGo unless
@@ -302,7 +346,11 @@ func (s *Server) readSettings() (*settings, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &settings{SearchProvider: provider, HasSearchKey: key != ""}, nil
+	defaults, err := s.chatDefaults()
+	if err != nil {
+		return nil, err
+	}
+	return &settings{SearchProvider: provider, HasSearchKey: key != "", ChatDefaults: defaults}, nil
 }
 
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
@@ -314,6 +362,9 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SearchProvider opt[string] `json:"searchProvider"`
 		SearchKey      opt[string] `json:"searchKey"` // "" clears the key, omitted or null keeps it
+		// ChatDefaults replaces the saved configuration as a whole (fields
+		// left out take the new-chat defaults); null forgets it.
+		ChatDefaults opt[configBody] `json:"chatDefaults"`
 	}
 	out, err := func() (*settings, error) {
 		if err := decode(r, &body); err != nil {
@@ -329,6 +380,11 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		if k := body.SearchKey.value(); k != nil {
 			if err := s.db.SetSetting(settingSearchKey, strings.TrimSpace(*k)); err != nil {
+				return nil, err
+			}
+		}
+		if body.ChatDefaults.Set {
+			if err := s.saveChatDefaults(body.ChatDefaults); err != nil {
 				return nil, err
 			}
 		}

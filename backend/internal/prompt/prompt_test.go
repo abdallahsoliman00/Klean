@@ -70,6 +70,36 @@ func TestBuildKeepsCallsWhole(t *testing.T) {
 	}
 }
 
+func TestCleanTitle(t *testing.T) {
+	cases := map[string]string{
+		"\"Planning a trip to Rome.\"\n": "Planning a trip to Rome",
+		"## **Sorting in Go**":           "Sorting in Go",
+		"  two\n lines?! ":               "two lines",
+		"Learning C#":                    "Learning C#",
+		" \"\" ":                         "",
+	}
+	for raw, want := range cases {
+		if got := CleanTitle(raw); got != want {
+			t.Errorf("CleanTitle(%q) = %q, want %q", raw, got, want)
+		}
+	}
+	long := CleanTitle(strings.Repeat("é", config.ChatTitleMaxChars+8))
+	if len([]rune(long)) != config.ChatTitleMaxChars {
+		t.Fatalf("long title has %d characters", len([]rune(long)))
+	}
+}
+
+func TestTitleTurns(t *testing.T) {
+	turns := TitleTurns(strings.Repeat("u", config.TitleInputChars+5), "the reply")
+	if len(turns) != 1 || turns[0].Role != "user" {
+		t.Fatalf("turns: %+v", turns)
+	}
+	c := turns[0].Content
+	if strings.Count(c, "u") != config.TitleInputChars || !strings.HasSuffix(c, "Assistant:\nthe reply") {
+		t.Fatalf("content: %q", c)
+	}
+}
+
 func TestMakeTitle(t *testing.T) {
 	if got := MakeTitle("  hello \n there "); got != "hello there" {
 		t.Fatalf("%q", got)

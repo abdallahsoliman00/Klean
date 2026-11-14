@@ -90,6 +90,20 @@ export interface ChatSettings {
   contextWindow: number;
 }
 
+/** Everything a chat is configured with: the model and its settings. A preset saves exactly this. */
+export interface ChatConfig extends ChatSettings {
+  providerId: string | null;
+  model: string | null;
+}
+
+/** A saved, named configuration. */
+export interface Preset extends ChatConfig {
+  id: string;
+  name: string;
+}
+
+export type PresetInput = Omit<Preset, 'id'>;
+
 export interface ChatSummary extends Partial<ChatSettings> {
   id: string;
   title: string;
@@ -135,6 +149,16 @@ export interface SearchSettingsPatch {
   searchKey?: string;
 }
 
+/** GET /settings: the search settings, plus the configuration new chats start with (null until one is saved). */
+export interface AppSettings extends SearchSettings {
+  chatDefaults: ChatConfig | null;
+}
+
+export interface SettingsPatch extends SearchSettingsPatch {
+  /** Replaces the saved configuration whole; null clears it. */
+  chatDefaults?: ChatConfig | null;
+}
+
 /** Body of POST /chats/:id/messages. */
 export interface SendBody {
   content: string;
@@ -155,6 +179,8 @@ export interface SendCallbacks {
   onToolRun?: (t: { id: string; name: string; args: ToolArgs }) => void;
   onToolEnd?: (part: ToolPart) => void;
   onArtifact?: (a: Artifact) => void;
+  /** A summary title, which may arrive after the reply has finished. */
+  onTitle?: (title: string) => void;
 }
 
 export interface SendResult {
@@ -183,8 +209,14 @@ export interface Api {
   artifacts: {
     remove(id: string): Promise<void>;
   };
+  presets: {
+    list(): Promise<Preset[]>;
+    create(data: PresetInput): Promise<Preset>;
+    update(id: string, patch: Partial<PresetInput>): Promise<Preset>;
+    remove(id: string): Promise<void>;
+  };
   settings: {
-    get(): Promise<SearchSettings>;
-    update(patch: SearchSettingsPatch): Promise<SearchSettings>;
+    get(): Promise<AppSettings>;
+    update(patch: SettingsPatch): Promise<AppSettings>;
   };
 }

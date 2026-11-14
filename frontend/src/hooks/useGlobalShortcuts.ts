@@ -4,7 +4,7 @@ import { artifactPanelOverlays } from '../lib/media';
 import { getStore } from '../store';
 
 /** Ctrl/Cmd+K model palette, Ctrl/Cmd+Shift+O new chat, Ctrl/Cmd+B sidebar, Escape closes the
-    topmost thing (or stops the reply), and typing anywhere lands in the composer. */
+    topmost thing (leaving a full-screen artifact panel first, or stopping the reply), and typing anywhere lands in the composer. */
 export function useGlobalShortcuts(artifactPane: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -26,7 +26,8 @@ export function useGlobalShortcuts(artifactPane: React.RefObject<HTMLElement | n
         else if (s.overlay || s.mobileOpen) {
           s.hideAll();
           s.closeMobile();
-        } else if (s.art.open && (artifactPane.current?.contains(document.activeElement) || artifactPanelOverlays() || !s.streaming)) s.closeArtifact(true);
+        } else if (s.art.full) s.toggleArtifactFull();
+        else if (s.art.open && (artifactPane.current?.contains(document.activeElement) || artifactPanelOverlays() || !s.streaming)) s.closeArtifact(true);
         else s.stop();
       } else if (!mod && e.key.length === 1 && document.activeElement === document.body) focusComposer();
     };

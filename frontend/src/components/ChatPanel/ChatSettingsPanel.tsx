@@ -1,11 +1,11 @@
-import { CONTEXT_WINDOW_OPTIONS, TEMPERATURE_RANGE } from '../../config';
+import { CONTEXT_WINDOW_OPTIONS, DEFAULT_CHAT_SETTINGS, TEMPERATURE_RANGE } from '../../config';
 import { useContextStats } from '../../hooks/useContextStats';
 import { systemPromptInput } from '../../lib/focus';
 import { getStore, useStore } from '../../store';
-import { DEFAULT_CHAT_SETTINGS } from '../../store/chats';
 import { CloseButton } from '../common/CloseButton';
+import { PresetsField } from './PresetsField';
 
-/** Side panel for this chat's system prompt, temperature and context window, plus token stats.
+/** Side panel for this chat's presets, system prompt, temperature and context window, plus token stats.
     Before the first message, the values are kept as a draft and the chat is created with them. */
 export function ChatSettingsPanel() {
   const open = useStore((s) => s.overlay === 'chatPanel');
@@ -21,6 +21,7 @@ export function ChatSettingsPanel() {
         <CloseButton onClick={hideAll} />
       </div>
       <div className="panel-body">
+        <PresetsField />
         <div className="field">
           <label htmlFor="sysPrompt">System prompt</label>
           <p className="sub">Sent at the start of every request in this chat.</p>

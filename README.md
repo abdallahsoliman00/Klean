@@ -217,6 +217,13 @@ Tool calls count too (arguments and outputs), as do the tool definitions; a call
 without its output.
 Set the window per chat from the ring in the top bar.
 
+Chat settings (the sliders button in the top bar) also holds **presets**: a saved, named model,
+system prompt, temperature and context window. Click one to use it in the current chat; its menu
+renames it, overwrites it with the current settings, or deletes it. Whatever configuration you used
+last is what the next new chat starts with. The artifact panel's inner edge drags (or takes the arrow
+keys) to resize it, the width is remembered per browser, and the button in its header makes it cover
+the app until Esc.
+
 ## API
 
 | Method | Path | |
@@ -229,7 +236,9 @@ Set the window per chat from the ring in the top bar.
 | POST | `/api/chats/{id}/restore` | undo a delete (kept for 24 hours) |
 | POST | `/api/chats/{id}/messages` | send; streams Server-Sent Events (below) |
 | DELETE | `/api/artifacts/{id}` | remove an artifact |
-| GET/PATCH | `/api/settings` | `{searchProvider, hasSearchKey}`; PATCH takes `searchProvider` (`duckduckgo`, `brave`, `tavily`) and `searchKey` (`""` clears it; never returned) |
+| GET/POST | `/api/presets` | list / save a preset (`name`, `providerId`, `model`, `systemPrompt`, `temperature`, `contextWindow`) |
+| PATCH/DELETE | `/api/presets/{id}` | change any of those fields / delete |
+| GET/PATCH | `/api/settings` | `{searchProvider, hasSearchKey, chatDefaults}`; PATCH takes `searchProvider` (`duckduckgo`, `brave`, `tavily`), `searchKey` (`""` clears it; never returned) and `chatDefaults` (the configuration new chats start with: the preset fields without `name`, replaced whole; `null` clears it) |
 
 `/messages` body: `{content, providerId, model}`, plus any of:
 
@@ -254,6 +263,7 @@ Events, in the order they can occur:
 | `tool_end` | `{part}` | the finished tool part |
 | `done` | `{message, title}` | the saved reply. If its last part is a pending `ask_user`, it is waiting for you |
 | `error` | `{message}` | instead of `done` |
+| `title` | `{title}` | after `done`, when a summary title was written for the chat; the stream stays open until then |
 
 Assistant messages carry `parts`, the reply in the order it was produced:
 `{type: "text", text}` and

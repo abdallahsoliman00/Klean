@@ -25,7 +25,8 @@ export function ChatList() {
         return (
           <Fragment key={c.id}>
             {first && <div className="group-label">{group}</div>}
-            <ChatItem chat={c} />
+            {/* keyed by title, so a row that gets a new title plays its entrance again */}
+            <ChatItem key={c.title} chat={c} />
           </Fragment>
         );
       })}

@@ -10,6 +10,10 @@
 // (see triggers below). Once the call's output comes back it answers in text.
 // /loop and /webloop call a tool on every request and never finish, NOTOOLS
 // rejects any request that carries tools with a 400.
+//
+// A request to name a chat (its instructions are config.TitleInstructions)
+// is answered with a fixed title and kept apart from the other requests.
+// NOTITLE in the chat's first message fails it, BLANKTITLE answers with nothing.
 package fakeprovider
 
 import (
@@ -19,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"klean/backend/internal/config"
 )
 
 type Fake struct {
@@ -26,7 +32,8 @@ type Fake struct {
 	last     map[string]any
 	lastHdr  http.Header
 	requests []map[string]any
-	calls    int // numbers the call ids
+	titles   []map[string]any // requests to name a chat
+	calls    int              // numbers the call ids
 }
 
 func New() *Fake { return &Fake{} }
@@ -44,6 +51,17 @@ func (f *Fake) Requests() []map[string]any {
 	defer f.mu.Unlock()
 	return append([]map[string]any(nil), f.requests...)
 }
+
+// TitleRequests returns every request to name a chat received so far.
+func (f *Fake) TitleRequests() []map[string]any {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]map[string]any(nil), f.titles...)
+}
+
+// titleReply is what a title request is answered with; the quotes and the
+// full stop are there for the server to remove.
+const titleReply = `"A short summary."`
 
 func (f *Fake) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -215,9 +233,14 @@ func (f *Fake) responses(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]any{"error": map[string]any{"message": err.Error()}})
 		return
 	}
+	isTitle := body["instructions"] == config.TitleInstructions
 	f.mu.Lock()
-	f.last, f.lastHdr = body, r.Header.Clone()
-	f.requests = append(f.requests, body)
+	if isTitle {
+		f.titles = append(f.titles, body)
+	} else {
+		f.last, f.lastHdr = body, r.Header.Clone()
+		f.requests = append(f.requests, body)
+	}
 	f.calls++
 	callNo := f.calls
 	f.mu.Unlock()
@@ -230,17 +253,25 @@ func (f *Fake) responses(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]any{"error": map[string]any{"message": "model exploded"}})
 		return
 	}
+	if isTitle && strings.Contains(lastUser, "NOTITLE") {
+		writeJSON(w, 500, map[string]any{"error": map[string]any{"message": "no title today"}})
+		return
+	}
 	if strings.Contains(lastUser, "NOTOOLS") && len(offered) > 0 {
 		writeJSON(w, 400, map[string]any{"error": map[string]any{"message": "this model does not support tools"}})
 		return
 	}
 	pause := 10 * time.Millisecond
-	if strings.Contains(lastUser, "SLOW") {
+	if strings.Contains(lastUser, "SLOW") && !isTitle {
 		pause = 300 * time.Millisecond
 	}
 	toolCall := pickCall(in, offered)
 	text := fmt.Sprintf("You said: **%s**. I received %d messages.\n\n```python\nprint('hello')\n```\n\nDone.", lastUser, len(items))
 	switch {
+	case isTitle && strings.Contains(lastUser, "BLANKTITLE"):
+		text = " "
+	case isTitle:
+		text = titleReply
 	case toolCall != nil:
 		text = "On it. "
 	case in.answered:

@@ -91,12 +91,39 @@ func BuildReserving(systemPrompt string, history []Turn, contextWindow, reserved
 	return picked
 }
 
+// clip shortens text to max characters.
+func clip(text string, max int) string {
+	if r := []rune(text); len(r) > max {
+		return string(r[:max])
+	}
+	return text
+}
+
+// TitleTurns is the input of the request that asks the model to name a chat:
+// the first message and its reply, each shortened.
+func TitleTurns(userMessage, reply string) []Turn {
+	return []Turn{{Role: "user", Content: "User:\n" + clip(userMessage, config.TitleInputChars) +
+		"\n\nAssistant:\n" + clip(reply, config.TitleInputChars)}}
+}
+
+// titleTrim is what a model may wrap a title in or end it with.
+const titleTrim = " \"'`*.,;:!?“”‘’…"
+
+// CleanTitle tidies a title the model wrote: one line, without quotes,
+// markdown or trailing punctuation, no longer than a chat title may be.
+// It returns "" when nothing usable is left.
+func CleanTitle(raw string) string {
+	t := strings.TrimLeft(strings.Join(strings.Fields(raw), " "), "# ") // a markdown heading
+	t = strings.Trim(t, titleTrim)
+	return strings.TrimRight(clip(t, config.ChatTitleMaxChars), titleTrim)
+}
+
 // MakeTitle turns the first message into a short chat title.
 func MakeTitle(text string) string {
 	t := strings.Join(strings.Fields(text), " ")
-	r := []rune(t)
-	if len(r) <= config.AutoTitleChars {
+	short := clip(t, config.AutoTitleChars)
+	if short == t {
 		return t
 	}
-	return strings.TrimRight(string(r[:config.AutoTitleChars]), " \t\n") + "…"
+	return strings.TrimRight(short, " \t\n") + "…"
 }

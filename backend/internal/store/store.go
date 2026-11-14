@@ -1,4 +1,4 @@
-// Package store keeps providers, chats, messages, artifacts and settings in SQLite.
+// Package store keeps providers, chats, messages, artifacts, presets and settings in SQLite.
 package store
 
 import (
@@ -28,12 +28,12 @@ CREATE TABLE IF NOT EXISTS providers (
 
 CREATE TABLE IF NOT EXISTS chats (
     id              TEXT PRIMARY KEY,
-    title           TEXT NOT NULL DEFAULT '%s',
+    title           TEXT NOT NULL DEFAULT '%[1]s',
     provider_id     TEXT REFERENCES providers(id) ON DELETE SET NULL,
     model           TEXT,
     system_prompt   TEXT NOT NULL DEFAULT '',
-    temperature     REAL NOT NULL DEFAULT %v,
-    context_window  INTEGER NOT NULL DEFAULT %d,
+    temperature     REAL NOT NULL DEFAULT %[2]v,
+    context_window  INTEGER NOT NULL DEFAULT %[3]d,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
     deleted_at      INTEGER
@@ -71,6 +71,17 @@ CREATE INDEX IF NOT EXISTS artifacts_chat ON artifacts(chat_id, created_at);
 CREATE TABLE IF NOT EXISTS settings (
     key    TEXT PRIMARY KEY,
     value  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS presets (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    provider_id     TEXT REFERENCES providers(id) ON DELETE SET NULL,
+    model           TEXT,
+    system_prompt   TEXT NOT NULL DEFAULT '',
+    temperature     REAL NOT NULL DEFAULT %[2]v,
+    context_window  INTEGER NOT NULL DEFAULT %[3]d,
+    created_at      INTEGER NOT NULL
 );
 `, config.DefaultChatTitle, config.DefaultTemperature, config.DefaultContextWindow)
 
@@ -510,6 +521,17 @@ func (d *DB) UpdateChat(id string, p ChatPatch, touch bool) (*Chat, error) {
 		}
 	}
 	return d.GetChat(id)
+}
+
+// ReplaceTitle sets the title only while it is still from, so a title the
+// user chose in the meantime is kept. It reports whether the title changed.
+func (d *DB) ReplaceTitle(id, from, to string) (bool, error) {
+	res, err := d.sql.Exec("UPDATE chats SET title = ? WHERE id = ? AND title = ? AND deleted_at IS NULL", to, id, from)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // DeleteChat soft-deletes; it reports whether a live chat was found.

@@ -33,6 +33,7 @@ const (
 
 	ProviderNameMaxChars = 80
 	ChatTitleMaxChars    = 200
+	PresetNameMaxChars   = 80
 
 	MinTemperature = 0.0
 	MaxTemperature = 2.0

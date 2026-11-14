@@ -41,6 +41,12 @@ export const httpApi: Api = {
   artifacts: {
     remove: (id) => req('DELETE', ENDPOINTS.artifact(id)),
   },
+  presets: {
+    list: () => req('GET', ENDPOINTS.presets),
+    create: (data) => req('POST', ENDPOINTS.presets, data),
+    update: (id, patch) => req('PATCH', ENDPOINTS.preset(id), patch),
+    remove: (id) => req('DELETE', ENDPOINTS.preset(id)),
+  },
   settings: {
     get: () => req('GET', ENDPOINTS.settings),
     update: (patch) => req('PATCH', ENDPOINTS.settings, patch),

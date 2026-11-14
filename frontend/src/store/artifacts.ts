@@ -16,6 +16,8 @@ export interface ArtifactsSlice {
     open: boolean;
     id: string | null;
     tab: ArtifactTab;
+    /** The panel covers the whole app. */
+    full: boolean;
     /** The button that opened the panel; focus returns there on close. */
     opener: HTMLElement | null;
   };
@@ -25,6 +27,7 @@ export interface ArtifactsSlice {
   toggleArtifacts(anchor: HTMLElement): void;
   showArtifact(id: string): void;
   setArtifactTab(tab: ArtifactTab): void;
+  toggleArtifactFull(): void;
   /** A new or updated artifact arrived from the stream. */
   putArtifact(a: Artifact): void;
   /** Drops the artifacts these messages created (the backend does the same when they are edited out). */
@@ -38,11 +41,11 @@ const findArtifact = (list: Artifact[] | undefined, id: string | null | undefine
 export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
   /** With nothing left to show, the panel closes. */
   const closeIfEmpty = () => {
-    if (!get().chat?.artifacts.length) set((s) => ({ art: { ...s.art, open: false } }));
+    if (!get().chat?.artifacts.length) set((s) => ({ art: { ...s.art, open: false, full: false } }));
   };
 
   return {
-    art: { open: false, id: null, tab: 'preview', opener: null },
+    art: { open: false, id: null, tab: 'preview', full: false, opener: null },
 
     openArtifact(id, opener) {
       if (!id || !findArtifact(get().chat?.artifacts, id)) return;
@@ -53,7 +56,7 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
     closeArtifact(refocus) {
       const { art } = get();
       if (!art.open) return;
-      set({ art: { ...art, open: false } });
+      set({ art: { ...art, open: false, full: false } });
       get().closePopover();
       if (!refocus) return;
       const o = art.opener;
@@ -73,6 +76,10 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
 
     setArtifactTab(tab) {
       set((s) => ({ art: { ...s.art, tab } }));
+    },
+
+    toggleArtifactFull() {
+      set((s) => ({ art: { ...s.art, full: !s.art.full } }));
     },
 
     putArtifact(a) {
@@ -110,7 +117,7 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
     },
 
     resetArtifacts() {
-      set({ art: { open: false, id: null, tab: get().art.tab, opener: null } });
+      set({ art: { open: false, id: null, tab: get().art.tab, full: false, opener: null } });
       get().closePopover();
     },
   };

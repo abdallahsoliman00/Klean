@@ -1,8 +1,6 @@
 /* Providers, their model lists, and the model the next message goes to. */
 import { api } from '../api';
-import { STORAGE_KEYS } from '../config';
 import { focusComposer } from '../lib/focus';
-import { writeJson } from '../lib/storage';
 import type { Model, Provider, ProviderInput } from '../types';
 import type { Slice } from './types';
 
@@ -20,7 +18,9 @@ export interface ProvidersSlice {
 
   /** Fetches a provider's models, unless they are already loaded (or `force`). */
   loadModels(providerId: string, force?: boolean): Promise<void>;
-  /** Switches the current chat (or the next new one) to this model. */
+  /** Switches the current chat (or the next new one) to this model, and remembers it for new chats. */
+  selectModel(sel: Selection): void;
+  /** The model palette's choice: selects it and closes the palette. */
   pickModel(provider: Provider, model: Model): void;
   /** Creates (id null) or updates a provider, then reloads the list and its models. */
   saveProvider(id: string | null, data: ProviderInput): Promise<Provider>;
@@ -52,16 +52,19 @@ export const createProvidersSlice: Slice<ProvidersSlice> = (set, get) => ({
     }
   },
 
-  pickModel(p, m) {
-    const sel = { providerId: p.id, model: m.id };
+  selectModel(sel) {
     set({ sel });
-    get().hideAll();
     const chat = get().chat;
     if (chat) {
-      get().updateChat((c) => ({ ...c, providerId: p.id, model: m.id }));
-      api.chats.update(chat.id, { providerId: p.id, model: m.id });
+      get().updateChat((c) => ({ ...c, ...sel }));
+      api.chats.update(chat.id, sel);
     }
-    writeJson(STORAGE_KEYS.lastModel, sel);
+    get().rememberConfig();
+  },
+
+  pickModel(p, m) {
+    get().selectModel({ providerId: p.id, model: m.id });
+    get().hideAll();
     focusComposer();
   },
 

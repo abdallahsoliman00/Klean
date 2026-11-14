@@ -1,17 +1,10 @@
 /* The chat list, the open chat, and the settings for a chat that doesn't exist yet. */
 import { api } from '../api';
-import { DEFAULT_CONTEXT_WINDOW, DEFAULT_TEMPERATURE, SAVE_DEBOUNCE_MS, STORAGE_KEYS, THREAD_FADE_MS } from '../config';
+import { DEFAULT_CHAT_SETTINGS, SAVE_DEBOUNCE_MS, THREAD_FADE_MS } from '../config';
 import { focusComposer } from '../lib/focus';
-import { readJson } from '../lib/storage';
-import type { Chat, ChatSettings, ChatSummary } from '../types';
-import type { Selection } from './providers';
+import type { Chat, ChatConfig, ChatSettings, ChatSummary } from '../types';
+import { currentConfig, modelExists } from './selectors';
 import type { Slice } from './types';
-
-export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
-  systemPrompt: '',
-  temperature: DEFAULT_TEMPERATURE,
-  contextWindow: DEFAULT_CONTEXT_WINDOW,
-};
 
 export interface ChatsSlice {
   booted: boolean;
@@ -22,6 +15,8 @@ export interface ChatsSlice {
   query: string;
   /** Settings picked before the first message; the chat is created with them. */
   draft: ChatSettings | null;
+  /** The configuration used last, which a new chat starts with. Null until the user has set one. */
+  chatDefaults: ChatConfig | null;
   /** The composer's text. */
   composerText: string;
   /** A chat whose row should animate in (it just got its title). */
@@ -35,11 +30,15 @@ export interface ChatsSlice {
   openChat(id: string): Promise<void>;
   newChat(): Promise<void>;
   renameChat(id: string, title: string): Promise<void>;
+  /** A title the backend wrote for a chat; its row in the sidebar animates. */
+  setChatTitle(id: string, title: string): void;
   deleteChat(c: ChatSummary): Promise<void>;
   /** Rewrites the open chat (no-op when there is none). */
   updateChat(fn: (c: Chat) => Chat): void;
   /** Changes the system prompt, temperature or context window of the open chat, or of the draft. */
   patchChatSettings(patch: Partial<ChatSettings>): void;
+  /** Saves the current configuration as the one new chats start with. */
+  rememberConfig(): void;
   setQuery(q: string): void;
   setComposerText(t: string): void;
 }
@@ -48,6 +47,7 @@ const withArtifacts = (c: Chat | null): Chat | null => (c ? { ...c, artifacts: A
 const summaryOf = ({ messages: _m, artifacts: _a, ...rest }: Chat): ChatSummary => rest;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let defaultsTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
   /** Fades the thread out, then swaps in the given chat. */
@@ -57,6 +57,21 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
     set((s) => ({ chat, live: null, switching: false, threadVersion: s.threadVersion + 1 }));
   }
 
+  /** Starts the new-chat draft from the configuration used last. A model that is gone is skipped:
+      the settings still apply, and the model picked before stays. */
+  function startDraft() {
+    const defaults = get().chatDefaults;
+    if (!defaults) return;
+    const { providerId, model, ...draft } = defaults;
+    set({ draft });
+    if (modelExists(get(), defaults)) set({ sel: { providerId, model } });
+  }
+
+  function retitle(id: string, title: string) {
+    set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, title } : c)) }));
+    if (get().chat?.id === id) get().updateChat((c) => ({ ...c, title }));
+  }
+
   return {
     booted: false,
     bootError: null,
@@ -64,6 +79,7 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
     chat: null,
     query: '',
     draft: null,
+    chatDefaults: null,
     composerText: '',
     freshChatId: null,
     switching: false,
@@ -73,15 +89,16 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
       try {
         const providers = await api.providers.list();
         const chats = await api.chats.list();
-        set({ providers, chats });
+        const presets = await api.presets.list();
+        const { chatDefaults } = await api.settings.get();
+        set({ providers, chats, presets, chatDefaults: chatDefaults ?? null });
       } catch (e) {
         set({ bootError: (e as Error).message });
         return;
       }
       const { providers, loadModels } = get();
-      const last = readJson<Selection>(STORAGE_KEYS.lastModel);
-      if (last && providers.some((p) => p.id === last.providerId)) set({ sel: last });
-      else if (providers[0]) {
+      startDraft();
+      if (!get().sel.model && providers[0]) {
         await loadModels(providers[0].id);
         const m = get().models[providers[0].id]?.[0];
         if (m) set({ sel: { providerId: providers[0].id, model: m.id } });
@@ -106,13 +123,18 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
       get().resetArtifacts();
       get().closeMobile();
       focusComposer();
+      startDraft();
       await showChat(null);
     },
 
     async renameChat(id, title) {
       await api.chats.update(id, { title });
-      set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, title } : c)) }));
-      if (get().chat?.id === id) get().updateChat((c) => ({ ...c, title }));
+      retitle(id, title);
+    },
+
+    setChatTitle(id, title) {
+      retitle(id, title);
+      set({ freshChatId: id });
     },
 
     async deleteChat(c) {
@@ -137,16 +159,23 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
 
     patchChatSettings(patch) {
       const chat = get().chat;
-      if (!chat) {
-        set((s) => ({ draft: { ...DEFAULT_CHAT_SETTINGS, ...s.draft, ...patch } }));
-        return;
+      if (!chat) set((s) => ({ draft: { ...DEFAULT_CHAT_SETTINGS, ...s.draft, ...patch } }));
+      else {
+        const next = { ...chat, ...patch };
+        get().updateChat((c) => ({ ...c, ...patch }));
+        // send all three, so a quick second change can't drop the first
+        const all = { systemPrompt: next.systemPrompt, temperature: next.temperature, contextWindow: next.contextWindow };
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => api.chats.update(chat.id, all), SAVE_DEBOUNCE_MS);
       }
-      const next = { ...chat, ...patch };
-      get().updateChat((c) => ({ ...c, ...patch }));
-      // send all three, so a quick second change can't drop the first
-      const all = { systemPrompt: next.systemPrompt, temperature: next.temperature, contextWindow: next.contextWindow };
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => api.chats.update(chat.id, all), SAVE_DEBOUNCE_MS);
+      get().rememberConfig();
+    },
+
+    rememberConfig() {
+      const chatDefaults = currentConfig(get());
+      set({ chatDefaults });
+      clearTimeout(defaultsTimer);
+      defaultsTimer = setTimeout(() => api.settings.update({ chatDefaults }), SAVE_DEBOUNCE_MS);
     },
 
     setQuery(query) {

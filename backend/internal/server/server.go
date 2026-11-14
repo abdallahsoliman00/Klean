@@ -58,6 +58,12 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Ha
 	mux.HandleFunc("POST /api/chats/{id}/messages", s.sendMessage)
 
 	mux.HandleFunc("DELETE /api/artifacts/{id}", s.deleteArtifact)
+
+	mux.HandleFunc("GET /api/presets", s.listPresets)
+	mux.HandleFunc("POST /api/presets", s.createPreset)
+	mux.HandleFunc("PATCH /api/presets/{id}", s.updatePreset)
+	mux.HandleFunc("DELETE /api/presets/{id}", s.deletePreset)
+
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PATCH /api/settings", s.updateSettings)
 

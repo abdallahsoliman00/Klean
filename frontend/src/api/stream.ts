@@ -1,9 +1,10 @@
 /* POST /chats/:id/messages and its event stream.
-   The parts are collected here too, so a reply stopped locally keeps what already arrived. */
+   The parts are collected here too, so a reply stopped locally keeps what already arrived.
+   The reply is finished at "done"; the stream stays open a little longer for a summary title. */
 import { LOCAL_MESSAGE_PREFIX } from '../config';
 import type { Part, SendBody, SendCallbacks, SendResult, ToolPart } from '../types';
 import { ApiError, errorFromResponse, isAbort, OFFLINE_MESSAGE } from './errors';
-import { readSse } from './sse';
+import { readSse, type SseEvent } from './sse';
 
 /** Mutable list of the parts that have arrived so far. */
 class PartCollector {
@@ -89,6 +90,15 @@ function dispatch(event: string, payload: any, parts: PartCollector, cb: SendCal
   return null;
 }
 
+/** Reads on after "done" for the summary title. The reply is already complete, so a failure here is ignored. */
+async function readLateTitle(events: AsyncGenerator<SseEvent>, cb: SendCallbacks) {
+  try {
+    for await (const { event, data } of events) if (event === 'title') cb.onTitle?.(JSON.parse(data).title);
+  } catch {
+    /* the connection dropped: the provisional title stays */
+  }
+}
+
 export async function streamMessage(url: string, body: SendBody, cb: SendCallbacks = {}): Promise<SendResult> {
   const { signal } = cb;
   const parts = new PartCollector();
@@ -107,18 +117,19 @@ export async function streamMessage(url: string, body: SendBody, cb: SendCallbac
   if (!res.ok) throw await errorFromResponse(res);
   if (!res.body) throw new ApiError('The reply was cut off before it finished.');
 
-  let result: SendResult | null = null;
+  const events = readSse(res.body);
   try {
-    for await (const { event, data } of readSse(res.body)) {
-      result = dispatch(event, JSON.parse(data), parts, cb) || result;
+    // not for-await: leaving that loop early would close the stream, and the title comes after "done"
+    for (let next = await events.next(); !next.done; next = await events.next()) {
+      const result = dispatch(next.value.event, JSON.parse(next.value.data), parts, cb);
+      if (!result) continue;
+      void readLateTitle(events, cb);
+      return result;
     }
   } catch (e) {
     if (isAbort(e)) return parts.stopped(body.model);
     throw e;
   }
-  if (!result) {
-    if (signal?.aborted) return parts.stopped(body.model);
-    throw new ApiError('The reply was cut off before it finished.');
-  }
-  return result;
+  if (signal?.aborted) return parts.stopped(body.model);
+  throw new ApiError('The reply was cut off before it finished.');
 }

@@ -1,5 +1,5 @@
 /* Seed data for the in-memory mock backend. */
-import type { Artifact, Chat, SearchResult } from '../../types';
+import type { Artifact, Chat, Preset, SearchResult } from '../../types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 const now = Date.now(),
@@ -21,6 +21,12 @@ export const providers: MockProvider[] = [
   { id: 'p2', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', hasKey: true,
     models: ['anthropic/claude-sonnet-4.5', 'openai/gpt-4.1-mini', 'meta-llama/llama-3.3-70b-instruct', 'deepseek/deepseek-chat', 'google/gemini-2.5-flash'] },
   { id: 'p3', name: 'LM Studio', baseUrl: 'http://localhost:1234/v1', hasKey: false, models: null, offline: true },
+];
+
+/* The second one names a model its provider no longer has, to show what applying it does. */
+export const presets: Preset[] = [
+  { id: 'pr1', name: 'Careful coder', providerId: 'p1', model: 'qwen2.5-coder:14b', systemPrompt: 'You are a careful senior engineer. Prefer small, tested changes.', temperature: 0.2, contextWindow: 131072 },
+  { id: 'pr2', name: 'Brainstorm', providerId: 'p1', model: 'llama2:7b', systemPrompt: 'Offer many ideas before judging any of them.', temperature: 1.2, contextWindow: 32768 },
 ];
 
 export const SAMPLE = {

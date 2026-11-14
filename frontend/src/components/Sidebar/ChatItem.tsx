@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DotsIcon, EditIcon, TrashIcon } from '../common/icons';
 import { getStore, useStore } from '../../store';
 import type { ChatSummary } from '../../types';
-import { RenameInput } from './RenameInput';
+import { RenameInput } from '../common/RenameInput';
 
 /** One row in the chat list: opens the chat; double-click or the menu renames it. */
 export function ChatItem({ chat }: { chat: ChatSummary }) {
@@ -23,6 +23,7 @@ export function ChatItem({ chat }: { chat: ChatSummary }) {
     <div className={'chat-item' + (active ? ' active' : '') + (fresh ? ' fresh' : '')}>
       {renaming ? (
         <RenameInput
+          label="Chat title"
           title={chat.title}
           onDone={(title) => {
             setRenaming(false);

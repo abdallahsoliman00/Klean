@@ -2,14 +2,14 @@
    Same method names and shapes as the HTTP client. Put one of these words in a message to see
    the matching tool UI (same words as the backend's fake provider, plus a few extras marked *):
      /artifact  /code  /svg  /md*  /update  /ask  /askmany*  /search  /fetch  /fail*  */
-import { KEYLESS_SEARCH_PROVIDER, MOCK_LATENCY, SEARCH_PROVIDERS, STATUS_CONFLICT } from '../../config';
-import type { Api, Message, Provider, ToolPart } from '../../types';
+import { KEYLESS_SEARCH_PROVIDER, MOCK_LATENCY, PRESET_NAME_MAX_CHARS, SEARCH_PROVIDERS, STATUS_CONFLICT, STATUS_INVALID } from '../../config';
+import type { Api, AppSettings, ChatConfig, Message, PresetInput, Provider, SendCallbacks, ToolPart } from '../../types';
 import { ApiError } from '../errors';
-import { artifacts, chats, providers, uid, type MockChat, type MockProvider } from './data';
+import { artifacts, chats, presets, providers, uid, type MockChat, type MockProvider } from './data';
 import { dropArtifacts, sleep, toolParts } from './helpers';
 import { scriptedReply } from './reply';
 
-const settings = { searchProvider: KEYLESS_SEARCH_PROVIDER as string, hasSearchKey: false };
+const settings: AppSettings = { searchProvider: KEYLESS_SEARCH_PROVIDER, hasSearchKey: false, chatDefaults: null };
 const trash: Record<string, MockChat> = {};
 const strip = ({ messages: _, ...rest }: MockChat) => ({ ...rest });
 const pub = (p: MockProvider): Provider => ({ id: p.id, name: p.name, baseUrl: p.baseUrl, hasKey: p.hasKey });
@@ -18,6 +18,24 @@ const mustChat = (id: string) => {
   if (!c) throw new ApiError('Chat not found.', 404);
   return c;
 };
+const mustPreset = (id: string) => {
+  const p = presets.find((x) => x.id === id);
+  if (!p) throw new ApiError('Preset not found.', 404);
+  return p;
+};
+/** The backend's checks on a preset or the chat defaults: a trimmed name of the right length, a provider that exists. */
+function checked<T extends Partial<PresetInput>>(data: T): T {
+  const name = data.name?.trim();
+  if (name !== undefined && (!name || name.length > PRESET_NAME_MAX_CHARS)) throw new ApiError(`name must be 1 to ${PRESET_NAME_MAX_CHARS} characters.`, STATUS_INVALID);
+  if (data.providerId && !providers.some((p) => p.id === data.providerId)) throw new ApiError('Unknown provider.', STATUS_INVALID);
+  return name === undefined ? data : { ...data, name };
+}
+/** Like the backend: a title that sums the chat up follows once the reply is done. */
+async function sendSummaryTitle(c: MockChat, prompt: string, cb: SendCallbacks) {
+  await sleep(MOCK_LATENCY.title);
+  c.title = 'About ' + prompt.replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' ').toLowerCase();
+  cb.onTitle?.(c.title);
+}
 const random = ([base, extra]: readonly [number, number]) => base + Math.random() * extra;
 
 export const mockApi: Api = {
@@ -127,6 +145,7 @@ export const mockApi: Api = {
       const stopped = !!cb.signal?.aborted;
       const am: Message = { id: uid(), role: 'assistant', model, content: parts.map((x) => (x.type === 'text' ? x.text : '')).join(''), parts, stopped, createdAt: Date.now() };
       if (parts.length) c.messages.push(am);
+      if (titled && !stopped) void sendSummaryTitle(c, prompt, cb);
       return structuredClone({ message: am, title: titled });
     },
   },
@@ -135,6 +154,23 @@ export const mockApi: Api = {
       await sleep(MOCK_LATENCY.read);
       const i = artifacts.findIndex((a) => a.id === id);
       if (i > -1) artifacts.splice(i, 1);
+    },
+  },
+  presets: {
+    async list() {
+      await sleep(MOCK_LATENCY.read);
+      return structuredClone(presets);
+    },
+    async create(data) {
+      const p = { ...checked(data), id: uid() };
+      presets.push(p);
+      return { ...p };
+    },
+    async update(id, patch) {
+      return { ...Object.assign(mustPreset(id), checked(patch)) };
+    },
+    async remove(id) {
+      presets.splice(presets.indexOf(mustPreset(id)), 1);
     },
   },
   settings: {
@@ -149,6 +185,7 @@ export const mockApi: Api = {
         settings.searchProvider = patch.searchProvider;
       }
       if (patch.searchKey !== undefined) settings.hasSearchKey = !!patch.searchKey;
+      if (patch.chatDefaults !== undefined) settings.chatDefaults = patch.chatDefaults && checked<ChatConfig>(patch.chatDefaults); // replaced whole, null clears
       return { ...settings };
     },
   },

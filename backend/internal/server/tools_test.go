@@ -408,7 +408,7 @@ func TestWebSearchAndFetch(t *testing.T) {
 	// Settings: default, validation, and the key is write-only.
 	var st map[string]any
 	e.do("GET", "/settings", nil, &st)
-	if len(st) != 2 || st["searchProvider"] != "duckduckgo" || st["hasSearchKey"] != false {
+	if len(st) != 3 || st["searchProvider"] != "duckduckgo" || st["hasSearchKey"] != false || st["chatDefaults"] != nil {
 		t.Fatalf("default settings: %v", st)
 	}
 	if code := e.do("PATCH", "/settings", map[string]any{"searchProvider": "bing"}, &st); code != 422 {
@@ -421,7 +421,7 @@ func TestWebSearchAndFetch(t *testing.T) {
 	}
 	st = nil
 	if code := e.do("PATCH", "/settings", map[string]any{"searchKey": "brave-key"}, &st); code != 200 ||
-		len(st) != 2 || st["searchProvider"] != "brave" || st["hasSearchKey"] != true {
+		len(st) != 3 || st["searchProvider"] != "brave" || st["hasSearchKey"] != true {
 		t.Fatalf("settings after key: %v", st)
 	}
 	ev = e.say("/search with brave", nil)

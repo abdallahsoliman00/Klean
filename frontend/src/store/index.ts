@@ -3,6 +3,7 @@ import { createArtifactsSlice } from './artifacts';
 import { createChatsSlice } from './chats';
 import { createDialogSlice } from './dialogs';
 import { createPreferencesSlice } from './preferences';
+import { createPresetsSlice } from './presets';
 import { createProvidersSlice } from './providers';
 import { createSendSlice } from './send';
 import type { Store } from './types';
@@ -13,6 +14,7 @@ export const useStore = create<Store>()((...a) => ({
   ...createDialogSlice(...a),
   ...createPreferencesSlice(...a),
   ...createProvidersSlice(...a),
+  ...createPresetsSlice(...a),
   ...createChatsSlice(...a),
   ...createArtifactsSlice(...a),
   ...createSendSlice(...a),

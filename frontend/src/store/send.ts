@@ -150,6 +150,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => ({
       onArtifact: (a) => {
         if (isCurrent()) get().putArtifact(a);
       },
+      onTitle: (title) => get().setChatTitle(chatId, title),
     };
 
     try {

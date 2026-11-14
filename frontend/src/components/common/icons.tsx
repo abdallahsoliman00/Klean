@@ -55,6 +55,12 @@ export const DownloadIcon = (p: IconProps) => (
   <Line size={16} {...p} strokeLinecap="round" strokeLinejoin="round"><path d="M8 2.5v7.5M4.8 7.2L8 10.3l3.2-3.1M3 13h10" /></Line>
 );
 /** The tick inside a radio or checkbox option. */
+export const ExpandIcon = (p: IconProps) => (
+  <Line {...p} strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9" /></Line>
+);
+export const ShrinkIcon = (p: IconProps) => (
+  <Line {...p} strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 6.5h-4v-4M9.5 6.5l4-4M2.5 9.5h4v4M6.5 9.5l-4 4" /></Line>
+);
 export const MarkIcon = () => (
   <Line size={11} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 8.5l3 3 6-6.5" /></Line>
 );

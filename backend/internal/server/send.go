@@ -262,7 +262,9 @@ func callTurn(p store.Part) prompt.Turn {
 // sendMessage streams Server-Sent Events: `user` (the saved user message) or
 // `answered` (the question that was answered), then `token` ({delta}) and the
 // tool events (`tool_start`, `tool_run`, `artifact`, `tool_end`) as the reply
-// is produced, then `done` ({message, title}) or `error` ({message}).
+// is produced, then `done` ({message, title}) or `error` ({message}). After
+// the `done` of the message that named the chat, `title` ({title}) follows
+// when the model could summarise the conversation into a better title.
 // Closing the connection stops generation; the partial reply is saved as stopped.
 func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	chatID := r.PathValue("id")
@@ -310,6 +312,11 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		send("done", map[string]any{"message": msg, "title": prep.title})
+		if prep.title != nil {
+			if title := s.summaryTitle(r.Context(), chatID, prep, msg.Content); title != "" {
+				send("title", map[string]string{"title": title})
+			}
+		}
 		return
 	}
 

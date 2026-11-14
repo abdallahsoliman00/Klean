@@ -24,12 +24,16 @@ export const ENDPOINTS = {
   chatMessages: (id: string) => `/chats/${id}/messages`,
   artifact: (id: string) => `/artifacts/${id}`,
   settings: '/settings',
+  presets: '/presets',
+  preset: (id: string) => `/presets/${id}`,
 } as const;
 
 /** HTTP status the backend sends when an answered question is no longer open. */
 export const STATUS_CONFLICT = 409;
 /** HTTP status of a reply with no body. */
 export const STATUS_NO_CONTENT = 204;
+/** HTTP status for a request the backend understood but won't accept. */
+export const STATUS_INVALID = 422;
 /** HTTP status for "already gone". */
 export const STATUS_NOT_FOUND = 404;
 
@@ -39,7 +43,7 @@ export const STORAGE_KEYS = {
   theme: 'sb:theme',
   scheme: 'sb:scheme',
   tools: 'sb:tools',
-  lastModel: 'sb:lastModel',
+  artWidth: 'sb:artWidth',
 } as const;
 
 /* ---------- appearance ---------- */
@@ -78,6 +82,8 @@ export const CONTEXT_WINDOW_OPTIONS = [
   { value: 524288, label: '512k tokens' },
   { value: 1048576, label: '1M tokens' },
 ] as const;
+/** What a chat starts with until the user has picked a configuration of their own. */
+export const DEFAULT_CHAT_SETTINGS = { systemPrompt: '', temperature: DEFAULT_TEMPERATURE, contextWindow: DEFAULT_CONTEXT_WINDOW };
 
 /* ---------- context estimate ---------- */
 
@@ -116,12 +122,17 @@ export const POPOVER_EDGE_PX = 8; // min distance from the window edge
 export const POPOVER_GAP_PX = 6; // between anchor and popover
 export const MENU_GAP_PX = 4;
 export const MENU_EDGE_RESERVE_PX = 180; // menu is kept this far from the right edge
+/** Artifact panel width in px when dragged: its limits, the arrow-key step, and the largest share of the
+    window it may take. Until it is dragged it uses --art from styles/tokens.css; keep `initial` in step with that. */
+export const ART_WIDTH = { min: 380, max: 1400, step: 24, maxShare: 0.6, initial: { share: 0.4, max: 680 } } as const;
 
 /* ---------- limits ---------- */
 
 export const MAX_ASK_OPTIONS = 4;
 export const MAX_HIGHLIGHT_CHARS = 300000; // bigger artifacts show as plain text
 export const MAX_FILENAME_CHARS = 80;
+/** Matches the backend's limit on a preset's name. */
+export const PRESET_NAME_MAX_CHARS = 80;
 
 /* ---------- message ids ---------- */
 
@@ -203,4 +214,5 @@ export const MOCK_LATENCY = {
   word: [14, 38],
   toolWrite: 350, // default time "writing" tool arguments
   toolRun: 650,
+  title: 1500, // the summary title, after the reply is done
 } as const;
