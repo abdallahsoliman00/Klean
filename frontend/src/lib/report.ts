@@ -2,7 +2,9 @@
    That HTML is untrusted. It is only ever placed in a frame that (1) is sandboxed without allow-scripts,
    so nothing in it can run, (2) carries a Content-Security-Policy that loads nothing from the network,
    and (3) was sanitised first: no script, no event handlers, no forms, no redirects, no links out.
-   The preview and the PDF are both made from that one frame document, split into pages the same way. */
+   The preview and the PDF made in the browser (lib/reportPdf) both come from that one frame document,
+   split into pages the same way. The backend's PDF (lib/reportDownload) is laid out by a real browser
+   from the same CSS, so its page breaks can differ a little from the preview's. */
 import DOMPurify from 'dompurify';
 import { CSS_PX_PER_MM, REPORT_CSP, REPORT_PAGE, REPORT_PDF } from '../config';
 

@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"klean/backend/internal/config"
+	"klean/backend/internal/pdf"
 	"klean/backend/internal/store"
 	"klean/backend/internal/tools"
 )
@@ -20,6 +21,8 @@ import (
 type Server struct {
 	db  *store.DB
 	web *tools.Web // web_search and fetch_page
+	// browser prints reports to PDF; nil when this machine has none.
+	browser *pdf.Browser
 }
 
 // Option adjusts a Server; tests use it to keep the web tools off the internet.
@@ -27,6 +30,9 @@ type Option func(*Server)
 
 // WithWeb replaces the web tools, for example with ones pointed at a stub.
 func WithWeb(w *tools.Web) Option { return func(s *Server) { s.web = w } }
+
+// WithBrowser sets the browser reports are printed to PDF with.
+func WithBrowser(b *pdf.Browser) Option { return func(s *Server) { s.browser = b } }
 
 // New returns the HTTP handler. static holds the frontend (index.html at its
 // root), or is nil to serve only the API. corsOrigins is a comma-separated
@@ -59,6 +65,7 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Ha
 
 	mux.HandleFunc("GET /api/images/{id}", s.getImage)
 	mux.HandleFunc("DELETE /api/artifacts/{id}", s.deleteArtifact)
+	mux.HandleFunc("POST /api/artifacts/{id}/pdf", s.artifactPDF)
 
 	mux.HandleFunc("GET /api/presets", s.listPresets)
 	mux.HandleFunc("POST /api/presets", s.createPreset)

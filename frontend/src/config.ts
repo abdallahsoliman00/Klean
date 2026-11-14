@@ -23,6 +23,7 @@ export const ENDPOINTS = {
   chatRestore: (id: string) => `/chats/${id}/restore`,
   chatMessages: (id: string) => `/chats/${id}/messages`,
   artifact: (id: string) => `/artifacts/${id}`,
+  artifactPdf: (id: string) => `/artifacts/${id}/pdf`,
   image: (id: string) => `/images/${id}`,
   skills: '/skills',
   skill: (id: string) => `/skills/${id}`,
@@ -39,6 +40,10 @@ export const STATUS_NO_CONTENT = 204;
 export const STATUS_INVALID = 422;
 /** HTTP status for "already gone". */
 export const STATUS_NOT_FOUND = 404;
+/** HTTP status when the backend can't make a report's PDF: no Chromium-based browser on this machine. */
+export const STATUS_NOT_IMPLEMENTED = 501;
+/** HTTP status when the backend's browser failed to make the PDF, or took too long. */
+export const STATUS_BAD_GATEWAY = 502;
 
 /* ---------- browser storage ---------- */
 
@@ -235,6 +240,7 @@ export const CSS_PX_PER_MM = 96 / 25.4;
 export const REPORT_PAGE = { widthMm: 210, heightMm: 297, marginMm: 14 } as const;
 /** The preview's sheets: never drawn larger than `maxFit` times life size, `gutterPx` from the panel's edges. */
 export const REPORT_PREVIEW = { maxFit: 1.25, gutterPx: 20 } as const;
+export const PDF_TYPE = 'application/pdf';
 export const REPORT_PDF = {
   /** Canvas pixels per CSS pixel: 2 keeps text sharp when the PDF is zoomed or printed. */
   scale: 2,
@@ -246,6 +252,8 @@ export const REPORT_PDF = {
   /** Browsers refuse taller canvases; a longer report is rendered at a lower scale to fit. */
   maxCanvasPx: 32000,
   timeoutMs: 90000,
+  /** How long to wait for the backend's PDF before making it in the browser instead: a little past its own limit (config.PDFRenderTimeout). */
+  serverTimeoutMs: 35000,
 } as const;
 /** What a report's frame may load: nothing from the network, and no script. */
 export const REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";

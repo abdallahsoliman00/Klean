@@ -21,6 +21,8 @@ export function ReportView({ html, title }: { html: string; title: string }) {
       {Array.from({ length: pages }, (_, i) => (
         <Sheet key={i} doc={doc} index={i} pages={pages} title={title} onPaged={setPages} />
       ))}
+      {/* the backend's browser lays the PDF out itself, so its pages can end a little earlier or later */}
+      <p className="report-note">Page breaks in the PDF may differ slightly.</p>
     </div>
   );
 }

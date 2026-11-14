@@ -9,6 +9,9 @@
 //	--db   / KLEAN_DB            default: per-user data folder (see store.DefaultPath)
 //	--frontend / KLEAN_FRONTEND  default: the UI built into the executable;
 //	                                   a folder serves that instead, "none" serves only the API
+//	--browser / KLEAN_BROWSER    default: the first of Chrome, Chromium, Edge and Brave found;
+//	                                   the Chromium-based browser that prints reports to PDF
+//	                                   (a path or a name on PATH), "none" turns that off
 //	--no-browser / KLEAN_NO_BROWSER=1  don't open the browser on start
 //	--headless                         no browser and no terminal window (services, autostart)
 //	KLEAN_CORS                   default config.DefaultCORSOrigins (comma-separated origins)
@@ -30,6 +33,7 @@ import (
 
 	"klean/backend/internal/config"
 	"klean/backend/internal/launch"
+	"klean/backend/internal/pdf"
 	"klean/backend/internal/server"
 	"klean/backend/internal/store"
 	"klean/frontend"
@@ -71,6 +75,8 @@ func run() error {
 	dbPath := flag.String("db", defaultDB, "SQLite database file")
 	frontendDir := flag.String("frontend", env("KLEAN_FRONTEND", ""),
 		`serve the UI from this folder instead of the built-in copy ("none" = API only)`)
+	pdfBrowser := flag.String("browser", env("KLEAN_BROWSER", ""),
+		`Chromium-based browser that prints reports to PDF ("none" = off)`)
 	noBrowser := flag.Bool("no-browser", env("KLEAN_NO_BROWSER", "") != "", "don't open the browser on start")
 	headless := flag.Bool("headless", false, "don't open a browser or a terminal window (for services and autostart)")
 	flag.Parse()
@@ -86,6 +92,11 @@ func run() error {
 			return fmt.Errorf("--frontend %s is not a folder", *frontendDir)
 		}
 		static = os.DirFS(*frontendDir)
+	}
+
+	browser := pdf.Find(*pdfBrowser)
+	if browser == nil && *pdfBrowser != "" && *pdfBrowser != config.BrowserNone {
+		return fmt.Errorf("--browser %s is not a program that can be run", *pdfBrowser)
 	}
 
 	shown := *host
@@ -117,7 +128,7 @@ func run() error {
 	defer db.Close()
 
 	srv := &http.Server{
-		Handler:           server.New(db, static, env("KLEAN_CORS", config.DefaultCORSOrigins)),
+		Handler:           server.New(db, static, env("KLEAN_CORS", config.DefaultCORSOrigins), server.WithBrowser(browser)),
 		ReadHeaderTimeout: config.ReadHeaderTimeout,
 	}
 	fmt.Printf("\n  Klean is running at %s\n  Database: %s\n", url, *dbPath)

@@ -176,15 +176,22 @@ Tunable values (timeouts, sizes, limits, defaults, storage keys, endpoint paths)
 `frontend/src/config.ts`. Markdown, sanitising and highlighting come from the `marked`, `dompurify`
 and `highlight.js` packages; fonts are bundled from `src/assets/fonts`, so the app works offline.
 
-A report (`create_report`) is shown as A4 pages and downloaded as a PDF made in the browser with
-`html2pdf.js`, which is loaded only when **Download PDF** is pressed. The report's HTML is untrusted:
+A report (`create_report`) is shown as A4 pages and downloaded as a PDF. **Download PDF** asks the
+backend first (`POST /api/artifacts/{id}/pdf`), which renders the report with Chrome, Chromium, Edge
+or Brave if one of them is installed: that PDF has real, selectable text. Without one of those
+browsers, or if the render fails, the PDF is made in the page with `html2pdf.js` instead (loaded only
+then); that one is an image of each page, with no selectable text. Either way it is one click, and
+page breaks in the backend's PDF can differ slightly from the preview's. The report's HTML is untrusted:
 it is sanitised with DOMPurify and only ever placed in a frame that is sandboxed without
 `allow-scripts` and has a Content-Security-Policy that loads nothing from the network
 (`src/lib/report.ts`).
 
 In the mock (`npm run dev:mock`), these words in a message show each tool's UI: `/artifact`, `/code`,
 `/svg`, `/md`, `/report`, `/update`, `/ask`, `/askmany`, `/search`, `/fetch`, `/fail`, `/skill <name>`;
-`NOIMAGES` makes the model refuse attached images and `/notools` makes it refuse tools.
+`NOIMAGES` makes the model refuse attached images and `/notools` makes it refuse tools. The mock has
+no browser to render a report with, so **Download PDF** falls back to the in-page PDF; in a chat with
+`/serverpdf` in a message it returns a small PDF as the backend would, and with `/pdffail` its render
+fails (a 502), which also falls back.
 
 To serve a built copy without rebuilding the executable, point the backend at it:
 `go run ./backend --frontend frontend/dist`. To host the UI on another origin, start the backend

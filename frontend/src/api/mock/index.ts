@@ -2,16 +2,19 @@
    Same method names and shapes as the HTTP client. Put one of these words in a message to see
    the matching tool UI (same words as the backend's fake provider, plus a few extras marked *):
      /artifact  /code  /svg  /md*  /report  /update  /ask  /askmany*  /search  /fetch  /fail*  /skill <name>
-   NOIMAGES makes the model refuse a message with images, and /notools* makes it refuse tools. */
+   NOIMAGES makes the model refuse a message with images, and /notools* makes it refuse tools.
+   Download PDF answers 501 (no browser to render with), so the PDF is made in the page; in a chat with
+   /serverpdf* in a message it returns a small PDF instead, and with /pdffail* it answers 502. */
 import {
-  IMAGE_TYPES, KEYLESS_SEARCH_PROVIDER, MAX_IMAGE_BYTES, MAX_IMAGES_PER_MESSAGE, MOCK_LATENCY, PRESET_NAME_MAX_CHARS, SEARCH_PROVIDERS,
-  SKILL_DESCRIPTION_MAX_CHARS, SKILL_INSTRUCTIONS_MAX_CHARS, SKILL_NAME_MAX_CHARS, STATUS_CONFLICT, STATUS_INVALID, STATUS_NOT_FOUND,
+  IMAGE_TYPES, KEYLESS_SEARCH_PROVIDER, MAX_IMAGE_BYTES, MAX_IMAGES_PER_MESSAGE, MOCK_LATENCY, PRESET_NAME_MAX_CHARS, REPORT_KIND, SEARCH_PROVIDERS,
+  SKILL_DESCRIPTION_MAX_CHARS, SKILL_INSTRUCTIONS_MAX_CHARS, SKILL_NAME_MAX_CHARS, STATUS_BAD_GATEWAY, STATUS_CONFLICT, STATUS_INVALID, STATUS_NOT_FOUND, STATUS_NOT_IMPLEMENTED,
 } from '../../config';
 import type { Api, AppSettings, ChatConfig, ImageInput, Message, MessageImage, PresetInput, Provider, SendCallbacks, Skill, SkillInput, ToolPart } from '../../types';
 import { ApiError } from '../errors';
 import { artifacts, chats, images, presets, providers, skills, uid, type MockChat, type MockProvider } from './data';
 import { dropArtifacts, sleep, toolParts } from './helpers';
 import { scriptedReply } from './reply';
+import { mockPdf } from './report';
 
 const settings: AppSettings = { searchProvider: KEYLESS_SEARCH_PROVIDER, hasSearchKey: false, chatDefaults: null };
 const trash: Record<string, MockChat> = {};
@@ -198,6 +201,16 @@ export const mockApi: Api = {
       await sleep(MOCK_LATENCY.read);
       const i = artifacts.findIndex((a) => a.id === id);
       if (i > -1) artifacts.splice(i, 1);
+    },
+    async pdf(id) {
+      await sleep(MOCK_LATENCY.toolRun);
+      const a = artifacts.find((x) => x.id === id);
+      if (!a) throw new ApiError('Artifact not found.', STATUS_NOT_FOUND);
+      if (a.kind !== REPORT_KIND) throw new ApiError('Only reports can be made into a PDF.', STATUS_INVALID);
+      const said = (word: string) => chats.some((c) => c.id === a.chatId && c.messages.some((m) => m.content.includes(word)));
+      if (said('/pdffail')) throw new ApiError('The browser failed to make the PDF.', STATUS_BAD_GATEWAY);
+      if (!said('/serverpdf')) throw new ApiError('No Chromium-based browser was found on this machine.', STATUS_NOT_IMPLEMENTED);
+      return mockPdf(a.title);
     },
   },
   presets: {

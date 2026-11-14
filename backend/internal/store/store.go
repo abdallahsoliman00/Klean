@@ -775,7 +775,8 @@ func (d *DB) Artifacts(chatID string) ([]*Artifact, error) {
 	return out, rows.Err()
 }
 
-func (d *DB) getArtifact(id string) (*Artifact, error) {
+// Artifact returns the artifact, or nil, nil when there is none.
+func (d *DB) Artifact(id string) (*Artifact, error) {
 	a, err := scanArtifact(d.sql.QueryRow("SELECT "+artifactCols+" FROM artifacts WHERE id = ?", id))
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -791,7 +792,7 @@ func (d *DB) CreateArtifact(chatID, title, kind, language, content string) (*Art
 	if err != nil {
 		return nil, err
 	}
-	return d.getArtifact(id)
+	return d.Artifact(id)
 }
 
 // UpdateArtifact replaces the content (and the title, when given) and bumps
@@ -805,7 +806,7 @@ func (d *DB) UpdateArtifact(chatID, id, content string, title *string) (*Artifac
 	if n, err := res.RowsAffected(); err != nil || n == 0 {
 		return nil, err
 	}
-	return d.getArtifact(id)
+	return d.Artifact(id)
 }
 
 // DeleteArtifact reports whether the artifact existed.

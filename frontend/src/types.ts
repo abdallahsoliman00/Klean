@@ -237,6 +237,9 @@ export interface Api {
   };
   artifacts: {
     remove(id: string): Promise<void>;
+    /** A report as a PDF with real text, rendered by a browser on the backend's machine. Rejects with
+        status 501 when there is none; the caller then makes the PDF itself (lib/reportDownload). */
+    pdf(id: string): Promise<Blob>;
   };
   presets: {
     list(): Promise<Preset[]>;

@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
 	"klean/backend/internal/config"
 	"klean/backend/internal/llm"
+	"klean/backend/internal/pdf"
 	"klean/backend/internal/store"
 	"klean/backend/internal/tools"
 )
@@ -270,6 +272,34 @@ func (s *Server) deleteArtifact(w http.ResponseWriter, r *http.Request) {
 		err = orNotFound(nil, "Artifact not found.")
 	}
 	reply(w, http.StatusNoContent, nil, err)
+}
+
+// artifactPDF prints a report to a PDF with real text. Any failure tells the
+// frontend to make the PDF itself, so the details are for whoever debugs it.
+func (s *Server) artifactPDF(w http.ResponseWriter, r *http.Request) {
+	a, err := s.db.Artifact(r.PathValue("id"))
+	switch {
+	case err != nil:
+		reply(w, 0, nil, err)
+		return
+	case a == nil:
+		fail(w, http.StatusNotFound, "Artifact not found.")
+		return
+	case a.Kind != tools.KindReport:
+		fail(w, http.StatusUnprocessableEntity, "Only reports can be saved as a PDF.")
+		return
+	case s.browser == nil:
+		fail(w, http.StatusNotImplemented, "No Chromium-based browser (Chrome, Chromium, Edge or Brave) was found on this machine.")
+		return
+	}
+	out, err := pdf.Render(r.Context(), *s.browser, a.Content)
+	if err != nil {
+		log.Printf("printing artifact %s to PDF: %v", a.ID, err)
+		fail(w, http.StatusBadGateway, "The browser couldn't print the report: "+err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	_, _ = w.Write(out)
 }
 
 // ---------------- settings ----------------

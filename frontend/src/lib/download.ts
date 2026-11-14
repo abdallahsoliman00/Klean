@@ -1,8 +1,8 @@
 import { DOWNLOAD_REVOKE_MS } from '../config';
 
-/** Saves text as a file through a temporary link. */
-export function downloadText(content: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'application/octet-stream' }));
+/** Saves a blob as a file through a temporary link. */
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
@@ -11,3 +11,5 @@ export function downloadText(content: string, filename: string) {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_REVOKE_MS);
 }
+
+export const downloadText = (content: string, filename: string) => downloadBlob(new Blob([content], { type: 'application/octet-stream' }), filename);

@@ -20,6 +20,9 @@
 - [x] Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available. (Five schemes, each light and dark, in Settings → Appearance.)
 - [] Give the user the option to select from different code coloschemes as well.
 - [] Favourite chats.
+- [] Artifacts panel with all artifacts ever created. (in the panel below new chat)
+- [] Load old artifacts and continue working on them. (load multiple together in the same chat)
+- [] Use a patch method for the LLM to update an artifact instead of rewriting the entire file from scratch. This can be done by the LLM writing the EXACT text to match against and writing the replacement, both in the tool call. An edge case may arise if a document has lots of repeating text, so to mitigate that risk, the part to patch should be a UNIQUE section.
 - [x] Allow for multiple system prompts. (Save system prompts to database where all you do is load the system prompt and reuse it.)
 - [] Make the application download the most recent version of the tool if one is available.
 - [x] Possibly migrate the backend to Rust or Go while it's still small to make cross-compilation to other languages easier than Python.
@@ -40,6 +43,7 @@
 - [x] Group this TODO file into priorities, features and bugs.
 - [x] Make a CI/CD pipeline that has the most recent version of the tool available
 - [] Make the README more concise and write a nice story.
+- [] Create a logo or icon
 - [x] Create scripts for both the AI agents and local developers:
     - Code linting and formatting fir checks
     - Code type checking

@@ -1,24 +1,38 @@
 /* The HTTP client: the only module that talks to the real backend. */
-import { API_ORIGIN, API_PREFIX, ENDPOINTS, STATUS_NO_CONTENT } from '../config';
+import { API_ORIGIN, API_PREFIX, ENDPOINTS, PDF_TYPE, REPORT_PDF, STATUS_NO_CONTENT } from '../config';
 import type { Api } from '../types';
 import { errorFromResponse, ApiError, OFFLINE_MESSAGE } from './errors';
 import { streamMessage } from './stream';
 
 const ROOT = API_ORIGIN + API_PREFIX;
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** The response to a request, or an ApiError if it can't be sent, times out or is refused. */
+async function send(method: string, path: string, body?: unknown, timeoutMs?: number): Promise<Response> {
   let res: Response;
   try {
     res = await fetch(ROOT + path, {
       method,
       headers: body ? { 'Content-Type': 'application/json' } : {},
       body: body ? JSON.stringify(body) : undefined,
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     });
   } catch {
     throw new ApiError(OFFLINE_MESSAGE);
   }
   if (!res.ok) throw await errorFromResponse(res);
+  return res;
+}
+
+async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await send(method, path, body);
   return (res.status === STATUS_NO_CONTENT ? null : await res.json()) as T;
+}
+
+async function pdf(path: string): Promise<Blob> {
+  const res = await send('POST', path, undefined, REPORT_PDF.serverTimeoutMs);
+  const blob = await res.blob();
+  if (blob.type !== PDF_TYPE) throw new ApiError('The backend did not send a PDF.'); // e.g. an older backend answering with a page
+  return blob;
 }
 
 export const httpApi: Api = {
@@ -40,6 +54,7 @@ export const httpApi: Api = {
   },
   artifacts: {
     remove: (id) => req('DELETE', ENDPOINTS.artifact(id)),
+    pdf: (id) => pdf(ENDPOINTS.artifactPdf(id)),
   },
   presets: {
     list: () => req('GET', ENDPOINTS.presets),
