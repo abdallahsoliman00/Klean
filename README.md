@@ -39,27 +39,38 @@ Needs Go 1.26+ (https://go.dev/dl/) and Node.js 24+ (https://nodejs.org/) to bui
 
 **macOS / Linux**
 ```bash
-./run.sh
+./scripts/run.sh
 ```
 
 **Windows**
 ```bat
-run.bat
+scripts\run.bat
 ```
 
-Both build the UI and `./klean` (dependencies are downloaded the first time), start it, and open
-**http://localhost:8787** in your browser. Manual equivalent:
+**PowerShell (Windows, macOS or Linux)**
+```powershell
+./scripts/run.ps1
+```
+
+All of them build the UI and `./klean` (dependencies are downloaded the first time), start it, and
+open **http://localhost:8787** in your browser. Manual equivalent:
 `(cd frontend && npm ci && npm run build) && go build -o klean ./backend && ./klean`
 
 ### Build for distribution
 
 ```bash
-./build.sh
+./scripts/build.sh
 ```
 
-puts a single self-contained executable per platform in `dist/` (Linux, macOS and Windows; amd64
-and arm64). Each one carries the UI inside it and needs nothing else installed: the SQLite driver
-is pure Go, so there's no cgo.
+or, in PowerShell:
+
+```powershell
+./scripts/build.ps1
+```
+
+Both put a single self-contained executable per platform in `dist/` (Linux, macOS and Windows;
+amd64 and arm64). Each one carries the UI inside it and needs nothing else installed: the SQLite
+driver is pure Go, so there's no cgo.
 
 ### What happens when it starts
 
@@ -75,14 +86,15 @@ is pure Go, so there's no cgo.
 
 ## Develop
 
-Two scripts wrap the everyday loop (Go 1.26+ and Node.js 24+, the same as `run.sh`):
+Two scripts wrap the everyday loop (Go 1.26+ and Node.js 24+, the same toolchain as the run scripts):
 
 | Script | What it does |
 |---|---|
 | `./scripts/check.sh` | Everything CI runs: `gofmt`, `oxlint`, `tsgo --noEmit`, the Vite build, `go vet` and `go test`. Add `--fix` to reformat Go and auto-fix lint findings first. |
 | `./scripts/dev.sh` | Runs the app in development: the Go backend on `:8787` plus the Vite dev server with hot reload on <http://localhost:5173>. `--mock` runs the UI alone against the in-memory mock backend; anything after `--` is passed to Vite. Ctrl+C stops both, and it uses a throwaway database in `.dev/`. |
 
-On Windows use `scripts\check.bat` and `scripts\dev.bat`. Run the check before committing.
+On Windows use `scripts\check.bat` and `scripts\dev.bat`, or in PowerShell (any OS) the matching
+`scripts\check.ps1` and `scripts\dev.ps1`. Run the check before committing.
 
 ## Responses API
 

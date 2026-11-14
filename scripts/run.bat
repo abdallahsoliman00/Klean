@@ -1,7 +1,7 @@
 @echo off
 rem Builds Klean and starts it at http://localhost:8787, opening the browser.
-rem Flags pass through, e.g. run.bat --port 9000 --no-browser
-cd /d "%~dp0"
+rem Flags pass through, e.g. scripts\run.bat --port 9000 --no-browser
+cd /d "%~dp0.."
 where go >nul 2>nul || goto :nogo
 where npm >nul 2>nul || goto :nonode
 pushd frontend
