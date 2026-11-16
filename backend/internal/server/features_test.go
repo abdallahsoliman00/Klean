@@ -372,7 +372,7 @@ func TestUseSkill(t *testing.T) {
 	if len(offered) != 1 || offered[0].(map[string]any)["name"] != "use_skill" {
 		t.Fatalf("offered: %v", offered)
 	}
-	if !strings.HasPrefix(instr, "Be brief.\n\n") || !strings.Contains(instr, "\n- tone: How to write to customers.") ||
+	if !strings.Contains(instr, ".\n\nBe brief.\n\n") || !strings.Contains(instr, "\n- tone: How to write to customers.") ||
 		strings.Contains(instr, "retired") || strings.Contains(instr, secret) || strings.Contains(instr, "create_artifact") {
 		t.Fatalf("instructions: %q", instr)
 	}
@@ -409,7 +409,7 @@ func TestUseSkill(t *testing.T) {
 	e.do("PATCH", "/skills/"+tone.ID, map[string]any{"enabled": false}, nil)
 	e.say("hello", map[string]any{"tools": []string{}})
 	last, _ := e.fake.Last()
-	if _, has := last["tools"]; has || last["instructions"] != "Be brief." {
+	if _, has := last["tools"]; has || !strings.HasSuffix(last["instructions"].(string), ".\n\nBe brief.") {
 		t.Fatalf("without skills: tools=%v instructions=%q", last["tools"], last["instructions"])
 	}
 }

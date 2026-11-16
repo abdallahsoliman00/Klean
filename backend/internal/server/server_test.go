@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -251,8 +252,9 @@ func TestChatFlow(t *testing.T) {
 	}
 	// The system prompt goes in `instructions`, and nothing is stored upstream.
 	last, _ := e.fake.Last()
-	// With tools on (the default), guidance on using them follows the prompt.
-	if instr, _ := last["instructions"].(string); !strings.HasPrefix(instr, "Be brief.\n\nYou can call tools.") {
+	// Klean's introduction (naming the model) comes first, then the prompt and,
+	// with tools on (the default), guidance on using them.
+	if instr, _ := last["instructions"].(string); !strings.HasPrefix(instr, fmt.Sprintf(config.Intro, "fake-small")+"\n\nBe brief.\n\nYou can call tools.") {
 		t.Fatalf("instructions: %q", instr)
 	}
 	if last["store"] != false || last["stream"] != true || last["model"] != "fake-small" {

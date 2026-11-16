@@ -135,11 +135,21 @@ func (s *Server) prepareSend(chatID string, body sendBody) (*prepared, error) {
 	}
 	out.req = llm.Request{
 		BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: body.Model,
-		Instructions: withGuidance(withGuidance(chat.SystemPrompt, tools.Guidance(groups)), tools.SkillGuidance(skillInfo(skills))),
+		Instructions: instructions(body.Model, chat.SystemPrompt, tools.Guidance(groups), tools.SkillGuidance(skillInfo(skills))),
 		Temperature:  chat.Temperature,
 		Tools:        defs,
 	}
 	return out, nil
+}
+
+// instructions is the system prompt the model gets: Klean's introduction,
+// the user's own prompt, then the guidance for tools and skills.
+func instructions(model, systemPrompt, toolGuidance, skillGuidance string) string {
+	out := fmt.Sprintf(config.Intro, model)
+	for _, section := range []string{systemPrompt, toolGuidance, skillGuidance} {
+		out = withGuidance(out, section)
+	}
+	return out
 }
 
 func withGuidance(systemPrompt, guidance string) string {
@@ -417,12 +427,19 @@ func (t *turn) toolStart(id, name string) {
 
 // run streams the reply, running tool calls and asking the model again until
 // it answers without calling any, asks the user something, or reaches the
-// round limit. Whatever was produced is left in t, also when it fails.
+// round limit, where it is asked for a final answer without tools. Whatever was produced is left in t, also when it fails.
 func (t *turn) run(ctx context.Context, prep *prepared) error {
 	var current []prompt.Turn // this reply so far, which is not in the database yet
 	maxRounds := config.MaxToolRounds
 	for round := 1; ; round++ {
 		req := prep.req
+		// Out of rounds: ask once more without tools, so the model reports what
+		// it found instead of the reply ending on a tool call.
+		final := round > maxRounds
+		if final {
+			req.Tools = nil
+			current = append(current, prompt.Turn{Role: "user", Content: config.ToolLimitPrompt})
+		}
 		// Older history gives way as this reply's tool results grow.
 		base := prompt.BuildReserving(req.Instructions, prep.history, prep.window, prep.reserved+prompt.Cost(current))
 		req.Turns = append(base, current...)
@@ -431,7 +448,7 @@ func (t *turn) run(ctx context.Context, prep *prepared) error {
 		if err != nil {
 			return err
 		}
-		if len(calls) == 0 {
+		if len(calls) == 0 || final {
 			return nil
 		}
 		if anyWebCall(calls) {
@@ -450,10 +467,6 @@ func (t *turn) run(ctx context.Context, prep *prepared) error {
 			current = append(current, callTurn(part))
 		}
 		if t.asked {
-			return nil
-		}
-		if round >= maxRounds {
-			t.token(fmt.Sprintf("\n\n*Stopped here: the model was still calling tools after %d rounds.*", maxRounds))
 			return nil
 		}
 	}

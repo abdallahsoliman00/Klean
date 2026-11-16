@@ -474,7 +474,7 @@ func TestToolGroups(t *testing.T) {
 		t.Fatalf("events: %s", got)
 	}
 	last, _ := e.fake.Last()
-	if _, has := last["tools"]; has || last["instructions"] != "Be brief." {
+	if _, has := last["tools"]; has || !strings.HasSuffix(last["instructions"].(string), ".\n\nBe brief.") {
 		t.Fatalf("request with tools off: tools=%v instructions=%q", last["tools"], last["instructions"])
 	}
 	// Only the enabled groups are offered and described.
@@ -551,11 +551,12 @@ func TestToolRoundCap(t *testing.T) {
 	if last.name != "done" {
 		t.Fatalf("ended with %s: %v", last.name, last.data)
 	}
-	if n := len(e.fake.Requests()); n != config.MaxToolRounds {
-		t.Fatalf("%d requests to the provider, want %d", n, config.MaxToolRounds)
+	// every round, then one request without tools for the final answer
+	if n := len(e.fake.Requests()); n != config.MaxToolRounds+1 {
+		t.Fatalf("%d requests to the provider, want %d", n, config.MaxToolRounds+1)
 	}
 	msg := last.data["message"].(map[string]any)
-	if !strings.Contains(msg["content"].(string), "Stopped here") || msg["stopped"] != false {
+	if !strings.Contains(msg["content"].(string), config.ToolLimitPrompt) || msg["stopped"] != false {
 		t.Fatalf("message: %v", msg["content"])
 	}
 	calls := 0
@@ -582,11 +583,12 @@ func TestWebToolRoundCap(t *testing.T) {
 	if last.name != "done" {
 		t.Fatalf("ended with %s: %v", last.name, last.data)
 	}
-	if n := len(e.fake.Requests()); n != config.MaxWebSearchToolRounds {
-		t.Fatalf("%d requests to the provider, want %d", n, config.MaxWebSearchToolRounds)
+	// every round, then one request without tools for the final answer
+	if n := len(e.fake.Requests()); n != config.MaxWebSearchToolRounds+1 {
+		t.Fatalf("%d requests to the provider, want %d", n, config.MaxWebSearchToolRounds+1)
 	}
 	msg := last.data["message"].(map[string]any)
-	if !strings.Contains(msg["content"].(string), fmt.Sprintf("after %d rounds", config.MaxWebSearchToolRounds)) {
+	if !strings.Contains(msg["content"].(string), config.ToolLimitPrompt) {
 		t.Fatalf("message: %v", msg["content"])
 	}
 	calls := 0
