@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -291,13 +290,17 @@ func callTurn(p store.Part) prompt.Turn {
 	return prompt.Turn{Role: "assistant", Call: &prompt.Call{ID: p.ID, Name: p.Name, Arguments: args, Output: output}}
 }
 
-// sendMessage streams Server-Sent Events: `user` (the saved user message) or
-// `answered` (the question that was answered), then `token` ({delta}) and the
-// tool events (`tool_start`, `tool_run`, `artifact`, `tool_end`) as the reply
-// is produced, then `done` ({message, title}) or `error` ({message}). After
-// the `done` of the message that named the chat, `title` ({title}) follows
-// when the model could summarise the conversation into a better title.
-// Closing the connection stops generation; the partial reply is saved as stopped.
+// sendMessage starts a reply and streams it as Server-Sent Events: `user`
+// (the saved user message) or `answered` (the question that was answered),
+// then `token` ({delta}) and the tool events (`tool_start`, `tool_run`,
+// `artifact`, `tool_end`) as the reply is produced, then `done` ({message,
+// title}), `error` ({message}) or `stopped` ({message}, null when nothing had
+// arrived). After the `done` of the message that named the chat, `title`
+// ({title}) follows when the model could summarise the conversation into a
+// better title.
+// The reply is written whether or not anyone is listening: closing the
+// connection leaves it running, and streamReply attaches to it again. A chat
+// that already has a reply running answers 409.
 func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 	chatID := r.PathValue("id")
 	var body sendBody
@@ -305,66 +308,64 @@ func (s *Server) sendMessage(w http.ResponseWriter, r *http.Request) {
 		reply(w, 0, nil, err)
 		return
 	}
-	prep, err := s.prepareSend(chatID, body)
+	// The chat is claimed first: preparing already changes its messages.
+	rn, err := s.startRun(chatID)
 	if err != nil {
 		reply(w, 0, nil, err)
 		return
 	}
-
-	h := w.Header()
-	h.Set("Content-Type", "text/event-stream")
-	h.Set("Cache-Control", "no-cache")
-	h.Set("X-Accel-Buffering", "no")
-	w.WriteHeader(http.StatusOK)
-	rc := http.NewResponseController(w)
-	send := func(event string, data any) {
-		var buf bytes.Buffer
-		enc := json.NewEncoder(&buf)
-		enc.SetEscapeHTML(false)
-		_ = enc.Encode(data)
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, bytes.TrimSpace(buf.Bytes()))
-		_ = rc.Flush()
-	}
-
-	if prep.userMsg != nil {
-		send("user", prep.userMsg)
-	}
-	if prep.answered != nil {
-		send("answered", prep.answered)
-	}
-	t := &turn{s: s, chatID: chatID, tools: prep.req.Tools, skills: prep.skills, send: send, started: map[string]bool{}}
-	err = t.run(r.Context(), prep)
-	t.flushText()
-
-	if err == nil {
-		msg, dbErr := s.db.AddMessage(chatID, "assistant", t.content(), body.Model, false, t.parts)
-		if dbErr != nil {
-			log.Printf("saving reply: %v", dbErr)
-			send("error", map[string]string{"message": "The reply couldn't be saved."})
-			return
-		}
-		send("done", map[string]any{"message": msg, "title": prep.title})
-		if prep.title != nil {
-			if title := s.summaryTitle(r.Context(), chatID, prep, msg.Content); title != "" {
-				send("title", map[string]string{"title": title})
-			}
-		}
+	prep, err := s.prepareSend(chatID, body)
+	if err != nil {
+		s.markSaved(chatID, rn)
+		s.endRun(rn)
+		reply(w, 0, nil, err)
 		return
 	}
+	if prep.userMsg != nil {
+		rn.send("user", prep.userMsg)
+	}
+	if prep.answered != nil {
+		rn.send("answered", prep.answered)
+	}
+	go s.generate(rn, chatID, body.Model, prep)
+	rn.streamTo(w, r, nil)
+}
+
+// generate writes the reply and saves it: whole, or as far as it got when it
+// was stopped or failed (the text and the finished tool calls).
+func (s *Server) generate(rn *run, chatID, model string, prep *prepared) {
+	defer s.endRun(rn)
+	t := &turn{s: s, chatID: chatID, tools: prep.req.Tools, skills: prep.skills, send: rn.send, started: map[string]bool{}}
+	err := t.run(rn.ctx, prep)
+	t.flushText()
+
+	var msg *store.Message
+	var dbErr error
+	if err == nil || len(t.parts) > 0 {
+		if msg, dbErr = s.db.AddMessage(chatID, "assistant", t.content(), model, err != nil, t.parts); dbErr != nil {
+			log.Printf("saving reply: %v", dbErr)
+		}
+	}
+	s.markSaved(chatID, rn)
 
 	var ue *llm.UpstreamError
-	if errors.As(err, &ue) {
-		send("error", map[string]string{"message": ue.Msg})
-	} else if r.Context().Err() == nil {
-		log.Printf("streaming reply: %v", err)
-		send("error", map[string]string{"message": "Something went wrong while streaming the reply."})
-	}
-	// Stopped by the user, or failed partway: keep the text and the finished
-	// tool calls that arrived.
-	if len(t.parts) > 0 {
-		if _, dbErr := s.db.AddMessage(chatID, "assistant", t.content(), body.Model, true, t.parts); dbErr != nil {
-			log.Printf("saving partial reply: %v", dbErr)
+	switch {
+	case err == nil && dbErr != nil:
+		rn.send("error", map[string]string{"message": "The reply couldn't be saved."})
+	case err == nil:
+		rn.send("done", map[string]any{"message": msg, "title": prep.title})
+		if prep.title != nil {
+			if title := s.summaryTitle(rn.ctx, chatID, prep, msg.Content); title != "" {
+				rn.send("title", map[string]string{"title": title})
+			}
 		}
+	case rn.ctx.Err() != nil: // stopped, the chat was deleted, or Klean is closing
+		rn.send("stopped", map[string]any{"message": msg})
+	case errors.As(err, &ue):
+		rn.send("error", map[string]string{"message": ue.Msg})
+	default:
+		log.Printf("streaming reply: %v", err)
+		rn.send("error", map[string]string{"message": "Something went wrong while streaming the reply."})
 	}
 }
 

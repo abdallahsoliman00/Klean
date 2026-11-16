@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS chats (
     context_window  INTEGER NOT NULL DEFAULT %[3]d,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
-    deleted_at      INTEGER
+    deleted_at      INTEGER,
+    favorite        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS chats_updated ON chats(updated_at DESC);
 
@@ -79,6 +80,16 @@ CREATE TABLE IF NOT EXISTS artifacts (
 );
 CREATE INDEX IF NOT EXISTS artifacts_chat ON artifacts(chat_id, created_at);
 
+-- Every version an artifact has had, the current one included.
+CREATE TABLE IF NOT EXISTS artifact_versions (
+    artifact_id  TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+    version      INTEGER NOT NULL,
+    title        TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    created_at   INTEGER NOT NULL,
+    PRIMARY KEY (artifact_id, version)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key    TEXT PRIMARY KEY,
     value  TEXT NOT NULL
@@ -109,6 +120,7 @@ CREATE TABLE IF NOT EXISTS skills (
 // existing table as it is, so these are added to older databases on open.
 var addedColumns = []struct{ table, column, decl string }{
 	{"messages", "parts", "TEXT"},
+	{"chats", "favorite", "INTEGER NOT NULL DEFAULT 0"},
 }
 
 type Provider struct {
@@ -129,6 +141,10 @@ type Chat struct {
 	ContextWindow int     `json:"contextWindow"`
 	CreatedAt     int64   `json:"createdAt"`
 	UpdatedAt     int64   `json:"updatedAt"`
+	Favorite      bool    `json:"favorite"`
+	// Running is whether a reply is being written. It isn't stored: the
+	// server, which knows, fills it in.
+	Running bool `json:"running"`
 }
 
 // ChatWithMessages is a chat as the thread view loads it. "messages" is
@@ -259,6 +275,28 @@ type Artifact struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
+// ArtifactVersion is an artifact as it was at one version.
+type ArtifactVersion struct {
+	Version   int    `json:"version"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// LibraryArtifact is an artifact as the library lists it: no content, which
+// can be large, and the title of its chat.
+type LibraryArtifact struct {
+	ID        string `json:"id"`
+	ChatID    string `json:"chatId"`
+	ChatTitle string `json:"chatTitle"`
+	Title     string `json:"title"`
+	Kind      string `json:"kind"`
+	Language  string `json:"language"`
+	Version   int    `json:"version"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
 // ChatPatch holds the columns to change; nil fields are left alone.
 type ChatPatch struct {
 	Title         *string
@@ -267,6 +305,7 @@ type ChatPatch struct {
 	SystemPrompt  *string
 	Temperature   *float64
 	ContextWindow *int
+	Favorite      *bool
 }
 
 type DB struct{ sql *sql.DB }
@@ -309,7 +348,8 @@ func Open(path string) (*DB, error) {
 
 func (d *DB) Close() error { return d.sql.Close() }
 
-// migrate adds the columns an older database is missing.
+// migrate adds the columns an older database is missing, and gives the
+// artifacts made before version history their current version as its start.
 func migrate(db *sql.DB) error {
 	for _, c := range addedColumns {
 		has, err := hasColumn(db, c.table, c.column)
@@ -323,7 +363,8 @@ func migrate(db *sql.DB) error {
 			return err
 		}
 	}
-	return nil
+	_, err := db.Exec(recordVersions + " WHERE id NOT IN (SELECT artifact_id FROM artifact_versions)")
+	return err
 }
 
 func hasColumn(db *sql.DB, table, column string) (bool, error) {
@@ -430,13 +471,13 @@ func (d *DB) DeleteProvider(id string) error {
 
 // ---------------- chats ----------------
 
-const chatCols = "id, title, provider_id, model, system_prompt, temperature, context_window, created_at, updated_at"
+const chatCols = "id, title, provider_id, model, system_prompt, temperature, context_window, created_at, updated_at, favorite"
 
 func scanChat(row interface{ Scan(...any) error }) (*Chat, error) {
 	var c Chat
 	var pid, model sql.NullString
 	if err := row.Scan(&c.ID, &c.Title, &pid, &model, &c.SystemPrompt, &c.Temperature,
-		&c.ContextWindow, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		&c.ContextWindow, &c.CreatedAt, &c.UpdatedAt, &c.Favorite); err != nil {
 		return nil, err
 	}
 	if pid.Valid {
@@ -502,8 +543,8 @@ func (d *DB) CreateChat(n NewChat) (*ChatWithMessages, error) {
 	if title == "" {
 		title = config.DefaultChatTitle
 	}
-	_, err := d.sql.Exec("INSERT INTO chats ("+chatCols+") VALUES (?,?,?,?,?,?,?,?,?)",
-		id, title, n.ProviderID, n.Model, n.SystemPrompt, n.Temperature, n.ContextWindow, ts, ts)
+	_, err := d.sql.Exec("INSERT INTO chats ("+chatCols+") VALUES (?,?,?,?,?,?,?,?,?,?)",
+		id, title, n.ProviderID, n.Model, n.SystemPrompt, n.Temperature, n.ContextWindow, ts, ts, false)
 	if err != nil {
 		return nil, err
 	}
@@ -532,6 +573,9 @@ func (d *DB) UpdateChat(id string, p ChatPatch, touch bool) (*Chat, error) {
 	}
 	if p.ContextWindow != nil {
 		add("context_window", *p.ContextWindow)
+	}
+	if p.Favorite != nil {
+		add("favorite", *p.Favorite)
 	}
 	if touch {
 		add("updated_at", NowMs())
@@ -784,9 +828,77 @@ func (d *DB) Artifact(id string) (*Artifact, error) {
 	return a, err
 }
 
+// LibraryArtifacts lists the artifacts of every chat that isn't deleted,
+// newest change first. Never nil, so it encodes as [].
+func (d *DB) LibraryArtifacts() ([]*LibraryArtifact, error) {
+	rows, err := d.sql.Query(`SELECT a.id, a.chat_id, c.title, a.title, a.kind, a.language, a.version,
+		a.created_at, a.updated_at FROM artifacts a JOIN chats c ON c.id = a.chat_id
+		WHERE c.deleted_at IS NULL ORDER BY a.updated_at DESC, a.rowid DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*LibraryArtifact{}
+	for rows.Next() {
+		var a LibraryArtifact
+		if err := rows.Scan(&a.ID, &a.ChatID, &a.ChatTitle, &a.Title, &a.Kind, &a.Language, &a.Version,
+			&a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, &a)
+	}
+	return out, rows.Err()
+}
+
+// ArtifactVersions lists every version of the artifact, oldest first. It is
+// empty only when there is no such artifact. Never nil, so it encodes as [].
+func (d *DB) ArtifactVersions(id string) ([]*ArtifactVersion, error) {
+	rows, err := d.sql.Query(`SELECT version, title, content, created_at FROM artifact_versions
+		WHERE artifact_id = ? ORDER BY version`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*ArtifactVersion{}
+	for rows.Next() {
+		var v ArtifactVersion
+		if err := rows.Scan(&v.Version, &v.Title, &v.Content, &v.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, &v)
+	}
+	return out, rows.Err()
+}
+
+// recordVersions copies the current state of artifacts into their history;
+// the caller appends the WHERE that picks which.
+const recordVersions = `INSERT INTO artifact_versions (artifact_id, version, title, content, created_at)
+	SELECT id, version, title, content, updated_at FROM artifacts`
+
+// writeArtifact runs a statement that creates or changes the artifact and
+// records the resulting version with it. It reports whether a row was written.
+func (d *DB) writeArtifact(id, query string, args ...any) (bool, error) {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(query, args...)
+	if err != nil {
+		return false, err
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 0 {
+		return false, err
+	}
+	if _, err := tx.Exec(recordVersions+" WHERE id = ?", id); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
 func (d *DB) CreateArtifact(chatID, title, kind, language, content string) (*Artifact, error) {
 	id, ts := newID(), NowMs()
-	_, err := d.sql.Exec(`INSERT INTO artifacts (`+artifactCols+`, after_seq) VALUES (?,?,?,?,?,?,1,?,?,
+	_, err := d.writeArtifact(id, `INSERT INTO artifacts (`+artifactCols+`, after_seq) VALUES (?,?,?,?,?,?,1,?,?,
 		COALESCE((SELECT MAX(seq) FROM messages WHERE chat_id = ?), 0))`,
 		id, chatID, title, kind, language, content, ts, ts, chatID)
 	if err != nil {
@@ -796,14 +908,11 @@ func (d *DB) CreateArtifact(chatID, title, kind, language, content string) (*Art
 }
 
 // UpdateArtifact replaces the content (and the title, when given) and bumps
-// the version. It returns nil, nil when the chat has no such artifact.
+// the version; the versions before it stay in the history. It returns nil, nil when the chat has no such artifact.
 func (d *DB) UpdateArtifact(chatID, id, content string, title *string) (*Artifact, error) {
-	res, err := d.sql.Exec(`UPDATE artifacts SET content = ?, title = COALESCE(?, title), version = version + 1,
+	found, err := d.writeArtifact(id, `UPDATE artifacts SET content = ?, title = COALESCE(?, title), version = version + 1,
 		updated_at = ? WHERE id = ? AND chat_id = ?`, content, title, NowMs(), id, chatID)
-	if err != nil {
-		return nil, err
-	}
-	if n, err := res.RowsAffected(); err != nil || n == 0 {
+	if err != nil || !found {
 		return nil, err
 	}
 	return d.Artifact(id)

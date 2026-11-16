@@ -6,12 +6,15 @@ import { Menu } from './components/common/Menu';
 import { Scrim } from './components/common/Scrim';
 import { Toasts } from './components/common/Toasts';
 import { Lightbox } from './components/Images/Lightbox';
+import { ArtifactLibrary } from './components/Library/ArtifactLibrary';
 import { ModelPalette } from './components/Palette/ModelPalette';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { ChatView } from './components/Thread/ChatView';
+import { useChatRoute } from './hooks/useChatRoute';
 import { useDocumentListeners } from './hooks/useDocumentListeners';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { useRunningChats } from './hooks/useRunningChats';
 import { useThemeSync } from './hooks/useThemeSync';
 import { useStore } from './store';
 import { artifactPanelOpen } from './store/selectors';
@@ -26,6 +29,8 @@ export function App() {
   useThemeSync();
   useDocumentListeners();
   useGlobalShortcuts(artifactPane);
+  useChatRoute();
+  useRunningChats();
   useEffect(() => {
     useStore.getState().boot();
   }, []);
@@ -40,6 +45,7 @@ export function App() {
       </div>
       <Scrim />
       <ModelPalette />
+      <ArtifactLibrary />
       <ChatSettingsPanel />
       <SettingsModal />
       <Menu />

@@ -33,6 +33,12 @@ export interface ChatsSlice {
   /** A title the backend wrote for a chat; its row in the sidebar animates. */
   setChatTitle(id: string, title: string): void;
   deleteChat(c: ChatSummary): Promise<void>;
+  /** Changes a chat in the list, and the open chat when it is the same one. */
+  patchChat(id: string, patch: Partial<Pick<ChatSummary, 'title' | 'favorite' | 'running'>>): void;
+  /** Fetches the list again: chats writing a reply in the background finish, move up and get their titles. */
+  refreshChats(): Promise<void>;
+  /** Stars or unstars a chat. Shown at once, and put back if the backend refuses. */
+  toggleFavorite(c: ChatSummary): Promise<void>;
   /** Rewrites the open chat (no-op when there is none). */
   updateChat(fn: (c: Chat) => Chat): void;
   /** Changes the system prompt, temperature or context window of the open chat, or of the draft. */
@@ -48,6 +54,8 @@ const summaryOf = ({ messages: _m, artifacts: _a, ...rest }: Chat): ChatSummary 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let defaultsTimer: ReturnType<typeof setTimeout> | undefined;
+/** Counts chat switches, so a chat that loads after another was asked for is dropped. */
+let openTurn = 0;
 
 export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
   /** Fades the thread out, then swaps in the given chat. */
@@ -65,11 +73,6 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
     const { providerId, model, ...draft } = defaults;
     set({ draft });
     if (modelExists(get(), defaults)) set({ sel: { providerId, model } });
-  }
-
-  function retitle(id: string, title: string) {
-    set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, title } : c)) }));
-    if (get().chat?.id === id) get().updateChat((c) => ({ ...c, title }));
   }
 
   return {
@@ -109,17 +112,21 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
     },
 
     async openChat(id) {
-      get().stop();
       get().closeMobile();
+      const turn = ++openTurn;
       if (get().chat?.id === id) return;
+      get().detach(); // a reply being written carries on at the backend
       const chat = withArtifacts(await api.chats.get(id));
+      if (turn !== openTurn) return;
       get().resetArtifacts();
       if (chat) set({ sel: { providerId: chat.providerId, model: chat.model } });
       await showChat(chat);
+      if (chat?.running && turn === openTurn) void get().attach(id);
     },
 
     async newChat() {
-      get().stop();
+      openTurn++;
+      get().detach();
       get().resetArtifacts();
       get().closeMobile();
       focusComposer();
@@ -129,11 +136,11 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
 
     async renameChat(id, title) {
       await api.chats.update(id, { title });
-      retitle(id, title);
+      get().patchChat(id, { title });
     },
 
     setChatTitle(id, title) {
-      retitle(id, title);
+      get().patchChat(id, { title });
       set({ freshChatId: id });
     },
 
@@ -141,6 +148,7 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
       await api.chats.remove(c.id);
       set((s) => ({ chats: s.chats.filter((x) => x.id !== c.id) }));
       if (get().chat?.id === c.id) {
+        get().detach();
         get().resetArtifacts();
         set((s) => ({ chat: null, live: null, threadVersion: s.threadVersion + 1 }));
       }
@@ -148,9 +156,28 @@ export const createChatsSlice: Slice<ChatsSlice> = (set, get) => {
         label: 'Undo',
         run: async () => {
           await api.chats.restore(c.id);
-          set({ chats: await api.chats.list() });
+          await get().refreshChats();
         },
       });
+    },
+
+    async toggleFavorite({ id, title, favorite }) {
+      get().patchChat(id, { favorite: !favorite });
+      try {
+        await api.chats.update(id, { favorite: !favorite });
+      } catch (e) {
+        get().patchChat(id, { favorite });
+        get().toast(`Couldn’t ${favorite ? 'remove' : 'add'} “${title}” ${favorite ? 'from' : 'to'} favourites. ${(e as Error).message}`);
+      }
+    },
+
+    patchChat(id, patch) {
+      set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
+      if (get().chat?.id === id) get().updateChat((c) => ({ ...c, ...patch }));
+    },
+
+    async refreshChats() {
+      set({ chats: await api.chats.list() });
     },
 
     updateChat(fn) {

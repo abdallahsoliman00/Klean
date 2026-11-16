@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"klean/backend/internal/config"
@@ -23,7 +25,18 @@ type Server struct {
 	web *tools.Web // web_search and fetch_page
 	// browser prints reports to PDF; nil when this machine has none.
 	browser *pdf.Browser
+	handler http.Handler
+
+	// The replies being written, by chat. See runs.go.
+	ctx    context.Context // cancelled by Close
+	cancel context.CancelFunc
+	mu     sync.Mutex
+	runs   map[string]*run
+	closed bool
+	active sync.WaitGroup // one for every run that hasn't ended
 }
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.handler.ServeHTTP(w, r) }
 
 // Option adjusts a Server; tests use it to keep the web tools off the internet.
 type Option func(*Server)
@@ -34,11 +47,12 @@ func WithWeb(w *tools.Web) Option { return func(s *Server) { s.web = w } }
 // WithBrowser sets the browser reports are printed to PDF with.
 func WithBrowser(b *pdf.Browser) Option { return func(s *Server) { s.browser = b } }
 
-// New returns the HTTP handler. static holds the frontend (index.html at its
+// New returns the server, which is the HTTP handler. Close it when done. static holds the frontend (index.html at its
 // root), or is nil to serve only the API. corsOrigins is a comma-separated
 // list, or "*".
-func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Handler {
-	s := &Server{db: db, web: tools.NewWeb()}
+func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) *Server {
+	s := &Server{db: db, web: tools.NewWeb(), runs: map[string]*run{}}
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	for _, o := range opts {
 		o(s)
 	}
@@ -62,8 +76,12 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Ha
 	mux.HandleFunc("DELETE /api/chats/{id}", s.deleteChat)
 	mux.HandleFunc("POST /api/chats/{id}/restore", s.restoreChat)
 	mux.HandleFunc("POST /api/chats/{id}/messages", s.sendMessage)
+	mux.HandleFunc("GET /api/chats/{id}/stream", s.streamReply)
+	mux.HandleFunc("POST /api/chats/{id}/stop", s.stopReply)
 
 	mux.HandleFunc("GET /api/images/{id}", s.getImage)
+	mux.HandleFunc("GET /api/artifacts", s.listArtifacts)
+	mux.HandleFunc("GET /api/artifacts/{id}/versions", s.artifactVersions)
 	mux.HandleFunc("DELETE /api/artifacts/{id}", s.deleteArtifact)
 	mux.HandleFunc("POST /api/artifacts/{id}/pdf", s.artifactPDF)
 
@@ -85,7 +103,8 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) http.Ha
 	if static != nil {
 		mux.Handle("/", http.FileServer(http.FS(static)))
 	}
-	return cors(mux, corsOrigins)
+	s.handler = cors(mux, corsOrigins)
+	return s
 }
 
 // ---------------- helpers ----------------

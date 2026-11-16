@@ -30,6 +30,9 @@ export const DotsIcon = ({ size = 14 }: IconProps) => (
 export const TrashIcon = (p: IconProps) => (
   <Line {...p} strokeLinecap="round"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" /></Line>
 );
+export const StarIcon = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
+  <Line {...p} strokeLinejoin="round" fill={filled ? 'currentColor' : 'none'}><path d="M8 2.2l1.75 3.7 4 .5-2.95 2.8.75 4L8 11.25 4.45 13.2l.75-4L2.25 6.4l4-.5z" /></Line>
+);
 export const PlusIcon = (p: IconProps) => (
   <Line {...p} strokeWidth={1.6} strokeLinecap="round"><path d="M8 3v10M3 8h10" /></Line>
 );

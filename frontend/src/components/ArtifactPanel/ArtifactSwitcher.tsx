@@ -27,7 +27,7 @@ export function ArtifactSwitcher({ current }: { current: Artifact }) {
       >
         <Glyph kind={current.kind} />
         <span className="t">{current.title || 'Untitled'}</span>
-        <span className="count">{list.length > 1 ? `${list.indexOf(current) + 1} of ${list.length}` : ''}</span>
+        <span className="count">{list.length > 1 ? `${list.findIndex((a) => a.id === current.id) + 1} of ${list.length}` : ''}</span>
         <CaretDownIcon />
       </button>
       <Popover id={POPOVER_ID}>

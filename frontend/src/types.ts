@@ -137,6 +137,10 @@ export interface ChatSummary extends Partial<ChatSettings> {
   title: string;
   providerId: string | null;
   model: string | null;
+  /** Starred: listed under Favourites at the top of the sidebar. */
+  favorite: boolean;
+  /** A reply is being written at the backend, whether or not this page is following it. */
+  running: boolean;
   updatedAt: number;
 }
 
@@ -152,6 +156,20 @@ export interface Artifact {
   updatedAt: number;
 }
 
+/** One saved version of an artifact (GET /artifacts/:id/versions, oldest first). Numbers need not start at 1. */
+export interface ArtifactVersion {
+  version: number;
+  title: string;
+  content: string;
+  createdAt: number;
+}
+
+/** A row of the artifacts library (GET /artifacts): an artifact without its content, and the chat it lives in. */
+export interface ArtifactSummary extends Omit<Artifact, 'content' | 'chatId'> {
+  chatId: string;
+  chatTitle: string;
+}
+
 export interface Chat extends ChatSummary {
   systemPrompt: string;
   temperature: number;
@@ -165,7 +183,7 @@ export interface ChatCreate extends Partial<ChatSettings> {
   model: string | null;
 }
 
-export type ChatPatch = Partial<ChatSettings & { title: string; providerId: string | null; model: string | null }>;
+export type ChatPatch = Partial<ChatSettings & { title: string; providerId: string | null; model: string | null; favorite: boolean }>;
 
 export interface SearchSettings {
   searchProvider: string;
@@ -200,6 +218,7 @@ export interface SendBody {
 }
 
 export interface SendCallbacks {
+  /** Aborting drops this connection only: the reply carries on at the backend (chats.stop ends it). */
   signal?: AbortSignal;
   onUser?: (m: Message) => void;
   onAnswered?: (a: { messageId: string; part: ToolPart }) => void;
@@ -233,9 +252,17 @@ export interface Api {
     update(id: string, patch: ChatPatch): Promise<unknown>;
     remove(id: string): Promise<void>;
     restore(id: string): Promise<void>;
+    /** Starts a reply and follows it to its end: finished, or stopped (the message then has `stopped`, and is empty when nothing was written). */
     send(chatId: string, body: SendBody, cb?: SendCallbacks): Promise<SendResult>;
+    /** Follows the reply a chat is already writing, from its start. Null when none is being written. */
+    attach(chatId: string, cb?: SendCallbacks): Promise<SendResult | null>;
+    /** Stops the reply being written; what there is of it is saved. */
+    stop(chatId: string): Promise<void>;
   };
   artifacts: {
+    /** Every artifact in every chat, newest first. */
+    list(): Promise<ArtifactSummary[]>;
+    versions(id: string): Promise<ArtifactVersion[]>;
     remove(id: string): Promise<void>;
     /** A report as a PDF with real text, rendered by a browser on the backend's machine. Rejects with
         status 501 when there is none; the caller then makes the PDF itself (lib/reportDownload). */

@@ -26,6 +26,12 @@
 .art-bar{display:flex;align-items:center;gap:4px;padding:0 10px 10px 12px;flex-shrink:0;min-height:44px}
 .art-bar .a-meta{margin-left:6px}
 .art-bar .seg+.a-meta{margin-left:12px}
+.art-bar .versions{margin-left:6px}
+.art-bar .btn.versions{height:28px;gap:4px;font-family:var(--mono);font-size:12px}
+/* shown while an older version is on show */
+.art-old{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 12px 10px;padding:7px 8px 7px 12px;border-radius:10px;background:var(--accent-soft);font-size:13px;line-height:1.4;animation:fresh .3s var(--ease)}
+.art-old button{flex-shrink:0;padding:4px 10px;border-radius:7px;font-weight:500;color:var(--accent);white-space:nowrap}
+.art-old button:hover{background:var(--raised)}
 .seg.small button{padding:4px 12px;font-size:13px}
 .icon-btn.done{color:var(--ok)}
 .icon-btn.danger:hover{color:var(--danger)}

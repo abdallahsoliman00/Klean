@@ -141,7 +141,17 @@ func asBadGateway(err error) error {
 
 func (s *Server) listChats(w http.ResponseWriter, r *http.Request) {
 	cs, err := s.db.ListChats()
+	for _, c := range cs {
+		s.setRunning(c)
+	}
 	reply(w, 200, cs, err)
+}
+
+// setRunning fills in whether the chat has a reply being written.
+func (s *Server) setRunning(c *store.Chat) {
+	if c != nil {
+		c.Running = s.runOf(c.ID) != nil
+	}
 }
 
 func (s *Server) createChat(w http.ResponseWriter, r *http.Request) {
@@ -196,6 +206,7 @@ func (s *Server) getChat(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, err
 		}
+		s.setRunning(c.Chat)
 		return &chatDetail{c, artifacts}, nil
 	}()
 	reply(w, 200, c, err)
@@ -209,6 +220,7 @@ func (s *Server) updateChat(w http.ResponseWriter, r *http.Request) {
 		SystemPrompt  opt[string]  `json:"systemPrompt"`
 		Temperature   opt[float64] `json:"temperature"`
 		ContextWindow opt[int]     `json:"contextWindow"`
+		Favorite      opt[bool]    `json:"favorite"`
 	}
 	c, err := func() (*store.Chat, error) {
 		id := r.PathValue("id")
@@ -243,13 +255,16 @@ func (s *Server) updateChat(w http.ResponseWriter, r *http.Request) {
 				return nil, err
 			}
 		}
+		p.Favorite = body.Favorite.value()
 		return s.db.UpdateChat(id, p, false)
 	}()
+	s.setRunning(c)
 	reply(w, 200, c, err)
 }
 
 func (s *Server) deleteChat(w http.ResponseWriter, r *http.Request) {
 	found, err := s.db.DeleteChat(r.PathValue("id"))
+	s.stopRun(r.PathValue("id")) // nobody is waiting for the reply any more
 	if err == nil && !found {
 		err = orNotFound(nil, "Chat not found.")
 	}
@@ -261,10 +276,25 @@ func (s *Server) restoreChat(w http.ResponseWriter, r *http.Request) {
 	if err == nil && c == nil {
 		err = orNotFound(nil, "Chat not found.")
 	}
+	s.setRunning(c)
 	reply(w, 200, c, err)
 }
 
 // ---------------- artifacts ----------------
+
+func (s *Server) listArtifacts(w http.ResponseWriter, r *http.Request) {
+	list, err := s.db.LibraryArtifacts()
+	reply(w, 200, list, err)
+}
+
+func (s *Server) artifactVersions(w http.ResponseWriter, r *http.Request) {
+	versions, err := s.db.ArtifactVersions(r.PathValue("id"))
+	// Every artifact has at least its current version.
+	if err == nil && len(versions) == 0 {
+		err = orNotFound(nil, "Artifact not found.")
+	}
+	reply(w, 200, versions, err)
+}
 
 func (s *Server) deleteArtifact(w http.ResponseWriter, r *http.Request) {
 	found, err := s.db.DeleteArtifact(r.PathValue("id"))

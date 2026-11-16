@@ -1,5 +1,5 @@
 /* Seed data for the in-memory mock backend. */
-import type { Artifact, Chat, Preset, SearchResult, Skill } from '../../types';
+import type { Artifact, ArtifactVersion, Chat, Preset, SearchResult, Skill } from '../../types';
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 const now = Date.now(),
@@ -116,7 +116,13 @@ A short plan that keeps the driving to the cool hours.
 export const artifacts: Artifact[] = [
   { id: 'a1', chatId: 'c0', title: 'Tide table', kind: 'html', language: '', content: SAMPLE.html, version: 1, createdAt: now - H, updatedAt: now - H },
   { id: 'a2', chatId: 'c0', title: 'retry.py', kind: 'code', language: 'python', content: SAMPLE.code, version: 2, createdAt: now - H + 5e4, updatedAt: now - H + 9e4 },
+  { id: 'a3', chatId: 'c2', title: 'Siwa in four days', kind: 'markdown', language: '', content: SAMPLE.markdown, version: 1, createdAt: now - 1.2 * D, updatedAt: now - 1.2 * D },
 ];
+
+/** The versions an artifact had before its current one, oldest first. */
+export const olderVersions: Record<string, ArtifactVersion[]> = {
+  a2: [{ version: 1, title: 'retry.py', content: SAMPLE.code.replace(', timeout=10', ''), createdAt: now - H + 5e4 }],
+};
 
 export const searchResults = (q: string): SearchResult[] => [
   { title: 'Write-Ahead Logging', url: 'https://www.sqlite.org/wal.html', snippet: 'The WAL journal mode lets readers and a writer work at the same time. Changes are appended to a separate log and checkpointed back into the database later.' },
@@ -125,10 +131,10 @@ export const searchResults = (q: string): SearchResult[] => [
   { title: 'A link with an unsafe scheme is shown as plain text', url: 'javascript:alert(1)', snippet: 'The UI must not turn this into a clickable link.' },
 ];
 
-/* Mock chats carry no artifacts field; get() joins them in. */
-export type MockChat = Omit<Chat, 'artifacts'>;
+/* Mock chats carry no artifacts or running field; the API joins them in. */
+export type MockChat = Omit<Chat, 'artifacts' | 'running'>;
 export const chats: MockChat[] = [
-  { id: 'c0', title: 'Tide table widget', providerId: 'p1', model: 'qwen2.5-coder:14b', updatedAt: now - H, systemPrompt: '', temperature: 0.4, contextWindow: 8192,
+  { id: 'c0', title: 'Tide table widget', favorite: false, providerId: 'p1', model: 'qwen2.5-coder:14b', updatedAt: now - H, systemPrompt: '', temperature: 0.4, contextWindow: 8192,
     messages: [
       { id: uid(), role: 'user', content: 'Look up how tide tables are usually laid out, then build me a tiny widget and a retry helper for the fetch.', parts: null, createdAt: now - H - 9e4 },
       { id: uid(), role: 'assistant', model: 'qwen2.5-coder:14b', createdAt: now - H,
@@ -146,19 +152,19 @@ export const chats: MockChat[] = [
           { type: 'text', text: 'Both are in the panel on the right. The helper is on its second version: I added the timeout.' },
         ] },
     ] },
-  { id: 'c1', title: 'Binary search edge cases', providerId: 'p1', model: 'qwen2.5-coder:14b', updatedAt: now - 2 * H, systemPrompt: '', temperature: 0.3, contextWindow: 8192,
+  { id: 'c1', title: 'Binary search edge cases', favorite: true, providerId: 'p1', model: 'qwen2.5-coder:14b', updatedAt: now - 2 * H, systemPrompt: '', temperature: 0.3, contextWindow: 8192,
     messages: [
       { id: uid(), role: 'user', content: 'Why does my binary search loop forever when the target is missing?' },
       { id: uid(), role: 'assistant', model: 'qwen2.5-coder:14b', content: "The usual cause is the update step. If you write `lo = mid` instead of `lo = mid + 1`, then once `hi - lo == 1` the midpoint rounds down to `lo` and nothing changes.\n\nHere is a version that always shrinks the range:\n\n```python\ndef search(xs, target):\n    lo, hi = 0, len(xs)  # hi is exclusive\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if xs[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(xs) and xs[lo] == target else -1\n```\n\nTwo things keep it safe:\n\n1. `hi` is **exclusive**, so the loop condition is `lo < hi`.\n2. Every branch moves a bound past `mid`, so the window strictly shrinks." },
     ] },
-  { id: 'c2', title: 'Trip packing list for Siwa', providerId: 'p2', model: 'openai/gpt-4.1-mini', updatedAt: now - 1.2 * D, systemPrompt: 'Be practical and brief.', temperature: 0.7, contextWindow: 16384,
+  { id: 'c2', title: 'Trip packing list for Siwa', favorite: false, providerId: 'p2', model: 'openai/gpt-4.1-mini', updatedAt: now - 1.2 * D, systemPrompt: 'Be practical and brief.', temperature: 0.7, contextWindow: 16384,
     messages: [
       { id: uid(), role: 'user', content: 'Packing list for 4 days in Siwa in November?' },
       { id: uid(), role: 'assistant', model: 'openai/gpt-4.1-mini', content: "Days are warm and nights get cold, so pack in layers.\n\n- Light long sleeves for sun\n- A fleece or down jacket for evenings in the desert\n- Closed shoes for the dunes, sandals for town\n- Swimwear for Cleopatra's Spring\n- Headlamp, sunscreen, and a scarf for wind and sand" },
     ] },
-  { id: 'c3', title: 'Explain SQLite WAL mode', providerId: 'p1', model: 'llama3.1:8b', updatedAt: now - 4 * D, systemPrompt: '', temperature: 0.7, contextWindow: 8192,
+  { id: 'c3', title: 'Explain SQLite WAL mode', favorite: false, providerId: 'p1', model: 'llama3.1:8b', updatedAt: now - 4 * D, systemPrompt: '', temperature: 0.7, contextWindow: 8192,
     messages: [{ id: uid(), role: 'user', content: 'What does WAL mode change in SQLite?' }, { id: uid(), role: 'assistant', model: 'llama3.1:8b', content: 'In WAL mode, writes go to a separate log file instead of overwriting the database in place. Readers keep seeing the last committed state while a writer appends, so **reads and writes no longer block each other**.' }] },
-  { id: 'c4', title: 'Regex for Egyptian phone numbers', providerId: 'p2', model: 'deepseek/deepseek-chat', updatedAt: now - 12 * D, systemPrompt: '', temperature: 0.2, contextWindow: 8192, messages: [{ id: uid(), role: 'user', content: 'Regex for Egyptian mobile numbers?' }, { id: uid(), role: 'assistant', model: 'deepseek/deepseek-chat', content: '`^(\\+20|0)?1[0125]\\d{8}$` matches numbers with an optional `+20` or leading `0`, followed by the four mobile prefixes.' }] },
+  { id: 'c4', title: 'Regex for Egyptian phone numbers', favorite: false, providerId: 'p2', model: 'deepseek/deepseek-chat', updatedAt: now - 12 * D, systemPrompt: '', temperature: 0.2, contextWindow: 8192, messages: [{ id: uid(), role: 'user', content: 'Regex for Egyptian mobile numbers?' }, { id: uid(), role: 'assistant', model: 'deepseek/deepseek-chat', content: '`^(\\+20|0)?1[0125]\\d{8}$` matches numbers with an optional `+20` or leading `0`, followed by the four mobile prefixes.' }] },
 ];
 
 export const replies: string[] = [

@@ -11,7 +11,8 @@
 .new-chat:hover{border-color:var(--faint)}
 .new-chat:active{transform:scale(.98)}
 .new-chat kbd{margin-left:auto}
-.search{position:relative;margin:10px 0 6px}
+.sidebar .side-item{margin-top:6px;padding:8px 12px;flex-shrink:0}
+.search{position:relative;margin:6px 0 6px}
 .search input{width:100%;padding:8px 10px 8px 32px;border-radius:9px;border:1px solid transparent;background:transparent;outline:none;transition:background .15s,border-color .15s}
 .search input:hover{background:var(--line-soft)}
 .search input:focus{background:var(--raised);border-color:var(--line)}
@@ -21,11 +22,14 @@
 .chat-item{position:relative;display:flex;align-items:center;border-radius:9px;transition:background .12s}
 .chat-item:hover{background:var(--line-soft)}
 .chat-item.active{background:var(--raised);box-shadow:0 0 0 1px var(--line)}
-.chat-item button.open{flex:1;min-width:0;text-align:left;padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
-.chat-item.active button.open,.chat-item:hover button.open{color:var(--ink)}
+.chat-item .open{text-decoration:none;flex:1;min-width:0;text-align:left;padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.chat-item.active .open,.chat-item:hover .open{color:var(--ink)}
+.chat-item .busy{flex-shrink:0;margin:0 6px 0 2px;color:var(--faint)}
 .chat-item .more{opacity:0;width:26px;height:26px;margin-right:4px;border-radius:6px;display:grid;place-items:center;color:var(--muted);transition:opacity .12s}
 .chat-item:hover .more,.chat-item.active .more,.chat-item .more:focus-visible{opacity:1}
 .chat-item .more:hover{background:var(--line)}
+.chat-item .star{margin-right:0}
+.chat-item .star.on{opacity:1;color:var(--caret)}
 .chat-item input{flex:1;margin:3px;padding:5px 7px;border:1px solid var(--accent);border-radius:7px;background:var(--raised);outline:none}
 .chat-item.fresh{animation:fresh .5s var(--ease)}
 @keyframes fresh{from{opacity:0;transform:translateY(-6px)}}

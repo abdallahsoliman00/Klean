@@ -6,7 +6,7 @@ import { artifactFilename, artifactsCreatedBy } from '../lib/artifacts';
 import { downloadReportPdf } from '../lib/reportDownload';
 import { artifactSwitch, focusComposer } from '../lib/focus';
 import { artifactPanelOverlays } from '../lib/media';
-import type { Artifact, Message } from '../types';
+import type { Artifact, ArtifactSummary, ArtifactVersion, Message } from '../types';
 import { artifactPanelOpen } from './selectors';
 import type { Slice } from './types';
 
@@ -17,6 +17,8 @@ export interface ArtifactsSlice {
     open: boolean;
     id: string | null;
     tab: ArtifactTab;
+    /** The version on show; null means the latest. */
+    version: number | null;
     /** The panel covers the whole app. */
     full: boolean;
     /** The button that opened the panel; focus returns there on close. */
@@ -27,6 +29,13 @@ export interface ArtifactsSlice {
   /** The topbar button: opens the last-shown (or newest) artifact, or closes the panel. */
   toggleArtifacts(anchor: HTMLElement): void;
   showArtifact(id: string): void;
+  /** Every saved version of an artifact, oldest first, once loaded. A new version from the stream drops its entry. */
+  versions: Record<string, ArtifactVersion[] | undefined>;
+  loadVersions(id: string): Promise<void>;
+  /** Shows an older version of the artifact on show; null goes back to the latest. */
+  showVersion(version: number | null): void;
+  /** The library's choice: goes to the chat the artifact was made in and opens it there. */
+  openFromLibrary(a: ArtifactSummary): Promise<void>;
   setArtifactTab(tab: ArtifactTab): void;
   toggleArtifactFull(): void;
   /** A new or updated artifact arrived from the stream. */
@@ -50,11 +59,12 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
   };
 
   return {
-    art: { open: false, id: null, tab: 'preview', full: false, opener: null },
+    art: { open: false, id: null, tab: 'preview', version: null, full: false, opener: null },
+    versions: {},
 
     openArtifact(id, opener) {
       if (!id || !findArtifact(get().chat?.artifacts, id)) return;
-      set((s) => ({ art: { ...s.art, id, open: true, opener: opener ?? s.art.opener } }));
+      set((s) => ({ art: { ...s.art, id, version: id === s.art.id ? s.art.version : null, open: true, opener: opener ?? s.art.opener } }));
       if (opener) setTimeout(() => artifactSwitch.current?.focus({ preventScroll: true }), ART_FOCUS_MS);
     },
 
@@ -76,7 +86,24 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
     },
 
     showArtifact(id) {
-      set((s) => ({ art: { ...s.art, id } }));
+      set((s) => ({ art: { ...s.art, id, version: null } }));
+    },
+
+    async loadVersions(id) {
+      const list = await api.artifacts.versions(id);
+      // kept only while it is current: a newer version may have arrived from the stream meanwhile
+      if (findArtifact(get().chat?.artifacts, id)?.version === list.at(-1)?.version) set((s) => ({ versions: { ...s.versions, [id]: list } }));
+    },
+
+    showVersion(version) {
+      set((s) => ({ art: { ...s.art, version } }));
+    },
+
+    async openFromLibrary({ id, chatId }) {
+      get().hideAll();
+      if (get().chat?.id !== chatId) await get().openChat(chatId);
+      if (get().chat?.id !== chatId || !findArtifact(get().chat?.artifacts, id)) return get().toast('That artifact is no longer there.');
+      get().openArtifact(id);
     },
 
     setArtifactTab(tab) {
@@ -91,6 +118,8 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
       const chat = get().chat;
       if (!chat) return;
       const isNew = !findArtifact(chat.artifacts, a.id);
+      // its version list is out of date, and the panel goes back to showing the latest
+      set((s) => ({ versions: { ...s.versions, [a.id]: undefined }, art: { ...s.art, version: null } }));
       get().updateChat((c) => ({ ...c, artifacts: isNew ? [...c.artifacts, a] : c.artifacts.map((x) => (x.id === a.id ? a : x)) }));
       // a new one opens itself when there is room beside the thread
       if (isNew && !artifactPanelOverlays()) {
@@ -128,7 +157,9 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
       set({ pdfFor: a.id });
       const name = artifactFilename(a);
       try {
-        await downloadReportPdf(a, name, api.artifacts.pdf);
+        // the backend renders the latest version only; an older one is made in the browser
+        const latest = findArtifact(get().chat?.artifacts, a.id)?.version === a.version;
+        await downloadReportPdf(a, name, latest ? api.artifacts.pdf : undefined);
         get().toast(`Downloaded ${name}`);
       } catch {
         get().toast('The PDF couldn’t be made. Press Download PDF to try again, or ask for a shorter report.');
@@ -138,7 +169,7 @@ export const createArtifactsSlice: Slice<ArtifactsSlice> = (set, get) => {
     },
 
     resetArtifacts() {
-      set({ art: { open: false, id: null, tab: get().art.tab, full: false, opener: null } });
+      set({ art: { open: false, id: null, tab: get().art.tab, version: null, full: false, opener: null }, versions: {} });
       get().closePopover();
     },
   };

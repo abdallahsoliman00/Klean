@@ -3,7 +3,6 @@ package server_test
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"klean/backend/internal/config"
 	"klean/backend/internal/fakeprovider"
@@ -65,8 +63,9 @@ func setupToolsWith(t *testing.T, fake *fakeprovider.Fake, opts ...server.Option
 	}
 	t.Cleanup(func() { db.Close() })
 	up := httptest.NewServer(fake.Handler())
-	api := httptest.NewServer(server.New(db, nil, "*", opts...))
-	t.Cleanup(func() { api.Close(); up.Close() })
+	srv := server.New(db, nil, "*", opts...)
+	api := httptest.NewServer(srv)
+	t.Cleanup(func() { srv.Close(); api.Close(); up.Close() })
 	e := &env{t, api, fake, up.URL + "/v1"}
 	var p provider
 	e.do("POST", "/providers", map[string]any{"name": "Fake", "baseUrl": e.base}, &p)
@@ -601,16 +600,15 @@ func TestWebToolRoundCap(t *testing.T) {
 	}
 }
 
-// Hanging up after a tool ran keeps the finished call in the saved reply.
+// Stopping after a tool ran keeps the finished call in the saved reply.
 func TestStopMidTurnKeepsFinishedCalls(t *testing.T) {
 	e := setupTools(t)
-	ctx, cancel := context.WithCancel(context.Background())
 	b, _ := json.Marshal(map[string]any{"providerId": e.providerID, "model": "fake-small", "content": "/artifact but SLOW"})
-	req, _ := http.NewRequestWithContext(ctx, "POST", e.api.URL+"/api/chats/"+e.chatID+"/messages", bytes.NewReader(b))
-	res, err := http.DefaultClient.Do(req)
+	res, err := http.Post(e.api.URL+"/api/chats/"+e.chatID+"/messages", "application/json", bytes.NewReader(b))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer res.Body.Close()
 	sc, seenEnd := bufio.NewScanner(res.Body), false
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	for sc.Scan() {
@@ -620,25 +618,19 @@ func TestStopMidTurnKeepsFinishedCalls(t *testing.T) {
 			break
 		}
 	}
-	cancel()
-	res.Body.Close()
+	if status := e.do("POST", "/chats/"+e.chatID+"/stop", nil, nil); status != 204 {
+		t.Fatalf("stop: %d", status)
+	}
 
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		got := e.chat()
-		if len(got.Messages) == 2 {
-			m := got.Messages[1]
-			if !m.Stopped || len(m.Parts) < 2 || m.Parts[1].Status != "done" || m.Parts[1].Name != "create_artifact" || len(got.Artifacts) != 1 {
-				t.Fatalf("stopped reply: %+v", m)
-			}
-			if strings.Contains(m.Content, "Done.") {
-				t.Fatalf("reply was not cut short: %q", m.Content)
-			}
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("partial reply not saved: %+v", got.Messages)
-		}
-		time.Sleep(50 * time.Millisecond)
+	got := e.chat()
+	if len(got.Messages) != 2 {
+		t.Fatalf("partial reply not saved: %+v", got.Messages)
+	}
+	m := got.Messages[1]
+	if !m.Stopped || len(m.Parts) < 2 || m.Parts[1].Status != "done" || m.Parts[1].Name != "create_artifact" || len(got.Artifacts) != 1 {
+		t.Fatalf("stopped reply: %+v", m)
+	}
+	if strings.Contains(m.Content, "Done.") {
+		t.Fatalf("reply was not cut short: %q", m.Content)
 	}
 }

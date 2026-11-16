@@ -247,6 +247,34 @@ func TestReport(t *testing.T) {
 	}
 }
 
+func TestArtifactLibraryAndVersions(t *testing.T) {
+	e := setupTools(t)
+	var library []map[string]any
+	if e.do("GET", "/artifacts", nil, &library); library == nil || len(library) != 0 {
+		t.Fatalf("empty library = %#v, want []", library)
+	}
+	e.say("/artifact please", nil)
+	e.say("/update it", nil)
+	id := e.chat().Artifacts[0].ID
+
+	e.do("GET", "/artifacts", nil, &library)
+	if len(library) != 1 || keys(library[0]) != "chatId,chatTitle,createdAt,id,kind,language,title,updatedAt,version" ||
+		library[0]["id"] != id || library[0]["chatId"] != e.chatID || library[0]["version"] != 2.0 {
+		t.Fatalf("library: %+v", library)
+	}
+	var versions []map[string]any
+	e.do("GET", "/artifacts/"+id+"/versions", nil, &versions)
+	if len(versions) != 2 || keys(versions[0]) != "content,createdAt,title,version" ||
+		versions[0]["version"] != 1.0 || versions[0]["title"] != "Demo page" ||
+		versions[1]["version"] != 2.0 || versions[1]["title"] != "Demo page (updated)" ||
+		versions[0]["content"] == versions[1]["content"] {
+		t.Fatalf("versions: %+v", versions)
+	}
+	if status := e.do("GET", "/artifacts/missing/versions", nil, nil); status != 404 {
+		t.Fatalf("versions of a missing artifact: %d", status)
+	}
+}
+
 type skill struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`

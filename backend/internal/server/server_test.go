@@ -3,7 +3,6 @@ package server_test
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"klean/backend/internal/config"
 	"klean/backend/internal/fakeprovider"
@@ -37,8 +35,9 @@ func setup(t *testing.T) *env {
 	t.Cleanup(func() { db.Close() })
 	fake := fakeprovider.New()
 	up := httptest.NewServer(fake.Handler())
-	api := httptest.NewServer(server.New(db, nil, "*"))
-	t.Cleanup(func() { api.Close(); up.Close() })
+	srv := server.New(db, nil, "*")
+	api := httptest.NewServer(srv)
+	t.Cleanup(func() { srv.Close(); api.Close(); up.Close() })
 	return &env{t, api, fake, up.URL + "/v1"}
 }
 
@@ -96,7 +95,10 @@ func parseSSE(t *testing.T, r io.Reader) []event {
 // is left out; sendAll returns it too.
 func (e *env) send(chatID string, body map[string]any) []event {
 	e.t.Helper()
-	ev := e.sendAll(chatID, body)
+	return e.withoutTitle(e.sendAll(chatID, body))
+}
+
+func (e *env) withoutTitle(ev []event) []event {
 	if n := len(ev); n > 0 && ev[n-1].name == "title" {
 		return ev[:n-1]
 	}
@@ -321,44 +323,111 @@ func TestChatFlow(t *testing.T) {
 	}
 }
 
-func TestStopSavesPartialReply(t *testing.T) {
-	e := setup(t)
-	var p provider
-	e.do("POST", "/providers", map[string]any{"name": "Fake", "baseUrl": e.base}, &p)
-	var c chat
-	e.do("POST", "/chats", map[string]any{}, &c)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	b, _ := json.Marshal(map[string]any{"providerId": p.ID, "model": "fake-small", "content": "go SLOW"})
-	req, _ := http.NewRequestWithContext(ctx, "POST", e.api.URL+"/api/chats/"+c.ID+"/messages", bytes.NewReader(b))
-	res, err := http.DefaultClient.Do(req)
+// slowReply sends a message the fake answers slowly and reads the reply's
+// stream until two tokens have arrived. The stream is left open.
+func (e *env) slowReply(chatID, providerID string) *http.Response {
+	e.t.Helper()
+	b, _ := json.Marshal(map[string]any{"providerId": providerID, "model": "fake-small", "content": "go SLOW"})
+	res, err := http.Post(e.api.URL+"/api/chats/"+chatID+"/messages", "application/json", bytes.NewReader(b))
 	if err != nil {
-		t.Fatal(err)
+		e.t.Fatal(err)
 	}
-	// Read until a couple of tokens have arrived, then hang up.
+	e.t.Cleanup(func() { res.Body.Close() })
 	sc, tokens := bufio.NewScanner(res.Body), 0
 	for tokens < 2 && sc.Scan() {
 		if sc.Text() == "event: token" {
 			tokens++
 		}
 	}
-	cancel()
-	res.Body.Close()
+	return res
+}
 
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		var got chat
-		e.do("GET", "/chats/"+c.ID, nil, &got)
-		if n := len(got.Messages); n == 2 {
-			if m := got.Messages[1]; !m.Stopped || m.Content == "" || strings.Contains(m.Content, "Done.") {
-				t.Fatalf("stopped reply: %+v", m)
-			}
-			return
+// chatOf loads a chat as a client that has just opened it would.
+func (e *env) chatOf(id string) (got struct {
+	Running  bool
+	Messages []message
+}) {
+	e.t.Helper()
+	e.do("GET", "/chats/"+id, nil, &got)
+	return got
+}
+
+func TestStopSavesPartialReply(t *testing.T) {
+	e := setup(t)
+	var p provider
+	e.do("POST", "/providers", map[string]any{"name": "Fake", "baseUrl": e.base}, &p)
+	var c chat
+	e.do("POST", "/chats", map[string]any{}, &c)
+	res := e.slowReply(c.ID, p.ID)
+
+	// A chat writes one reply at a time: nothing else may change it meanwhile.
+	for _, body := range []map[string]any{{"content": "another"}, {"regenerate": true}} {
+		body["providerId"], body["model"] = p.ID, "fake-small"
+		if status := e.do("POST", "/chats/"+c.ID+"/messages", body, nil); status != 409 {
+			t.Fatalf("sending %v while a reply is running: %d", body, status)
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("partial reply not saved: %+v", got.Messages)
-		}
-		time.Sleep(50 * time.Millisecond)
+	}
+	var list []map[string]any
+	if e.do("GET", "/chats", nil, &list); list[0]["running"] != true {
+		t.Fatalf("listed chat while running: %v", list[0])
+	}
+
+	// Stopping answers once the partial reply is saved.
+	if status := e.do("POST", "/chats/"+c.ID+"/stop", nil, nil); status != 204 {
+		t.Fatalf("stop: %d", status)
+	}
+	got := e.chatOf(c.ID)
+	if got.Running || len(got.Messages) != 2 {
+		t.Fatalf("after stop: %+v", got)
+	}
+	m := got.Messages[1]
+	if !m.Stopped || m.Content == "" || strings.Contains(m.Content, "Done.") {
+		t.Fatalf("stopped reply: %+v", m)
+	}
+	ev := parseSSE(t, res.Body)
+	if last := ev[len(ev)-1]; last.name != "stopped" || last.data["message"].(map[string]any)["id"] != m.ID {
+		t.Fatalf("last event: %+v", last)
+	}
+	if status := e.do("POST", "/chats/"+c.ID+"/stop", nil, nil); status != 204 {
+		t.Fatalf("stopping again: %d", status)
+	}
+}
+
+// Hanging up doesn't stop the reply: it is written and saved all the same,
+// and a client that comes back picks it up where it is.
+func TestReplyOutlivesClient(t *testing.T) {
+	e := setup(t)
+	var p provider
+	e.do("POST", "/providers", map[string]any{"name": "Fake", "baseUrl": e.base}, &p)
+	var c chat
+	e.do("POST", "/chats", map[string]any{}, &c)
+	e.slowReply(c.ID, p.ID).Body.Close()
+
+	if got := e.chatOf(c.ID); !got.Running || len(got.Messages) != 1 {
+		t.Fatalf("after hanging up: %+v", got)
+	}
+	res, err := http.Get(e.api.URL + "/api/chats/" + c.ID + "/stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	ev := e.withoutTitle(parseSSE(t, res.Body))
+	if res.StatusCode != 200 || len(ev) < 4 || ev[0].name != "token" || ev[1].name != "token" || ev[len(ev)-1].name != "done" {
+		t.Fatalf("attached stream: %d %+v", res.StatusCode, ev)
+	}
+	var replayed strings.Builder
+	for _, x := range ev[:len(ev)-1] {
+		replayed.WriteString(x.data["delta"].(string))
+	}
+	got := e.chatOf(c.ID)
+	if got.Running || len(got.Messages) != 2 {
+		t.Fatalf("after the reply: %+v", got)
+	}
+	if m := got.Messages[1]; m.Stopped || !strings.HasSuffix(m.Content, "Done.") || m.Content != replayed.String() {
+		t.Fatalf("reply: %+v, replayed %q", m, replayed.String())
+	}
+	if status := e.do("GET", "/chats/"+c.ID+"/stream", nil, nil); status != 204 {
+		t.Fatalf("attaching to a finished reply: %d", status)
 	}
 }
 
@@ -433,14 +502,14 @@ func keys(m map[string]any) string {
 
 func TestResponseShapes(t *testing.T) {
 	e := setup(t)
-	const chatKeys = "contextWindow,createdAt,id,model,providerId,systemPrompt,temperature,title,updatedAt"
+	const chatKeys = "contextWindow,createdAt,favorite,id,model,providerId,running,systemPrompt,temperature,title,updatedAt"
 
 	var created map[string]any
 	e.do("POST", "/chats", map[string]any{}, &created)
 	if msgs, ok := created["messages"].([]any); !ok || len(msgs) != 0 {
 		t.Fatalf("new chat messages = %#v, want []", created["messages"])
 	}
-	if got := keys(created); got != "contextWindow,createdAt,id,messages,model,providerId,systemPrompt,temperature,title,updatedAt" {
+	if got := keys(created); got != "contextWindow,createdAt,favorite,id,messages,model,providerId,running,systemPrompt,temperature,title,updatedAt" {
 		t.Fatalf("created chat keys: %s", got)
 	}
 	id := created["id"].(string)
@@ -460,6 +529,13 @@ func TestResponseShapes(t *testing.T) {
 	e.do("PATCH", "/chats/"+id, map[string]any{"title": "x"}, &patched)
 	if got := keys(patched); got != chatKeys {
 		t.Fatalf("patched chat keys: %s", got)
+	}
+	// A favourite keeps its place in the list: updatedAt stays as it was.
+	var starred map[string]any
+	e.do("PATCH", "/chats/"+id, map[string]any{"favorite": true}, &starred)
+	e.do("GET", "/chats", nil, &list)
+	if starred["favorite"] != true || list[0]["favorite"] != true || starred["updatedAt"] != created["updatedAt"] {
+		t.Fatalf("favourite chat: %v, listed %v, created %v", starred, list[0], created)
 	}
 
 	var p map[string]any

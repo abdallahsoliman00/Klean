@@ -3,12 +3,14 @@ import { groupOf } from '../../lib/dates';
 import { useStore } from '../../store';
 import { ChatItem } from './ChatItem';
 
-/** Chats matching the search, newest first, under date headings. */
+/** Chats matching the search: favourites first, then the rest newest first under date headings. */
 export function ChatList() {
   const chats = useStore((s) => s.chats);
   const query = useStore((s) => s.query);
   const q = query.toLowerCase();
-  const items = chats.filter((c) => !q || c.title.toLowerCase().includes(q));
+  const matching = chats.filter((c) => !q || c.title.toLowerCase().includes(q));
+  const groupFor = (c: (typeof chats)[number]) => (c.favorite ? 'Favourites' : groupOf(c.updatedAt));
+  const items = [...matching.filter((c) => c.favorite), ...matching.filter((c) => !c.favorite)];
 
   if (!items.length) {
     return (
@@ -20,8 +22,8 @@ export function ChatList() {
   return (
     <nav className="chat-list">
       {items.map((c, i) => {
-        const group = groupOf(c.updatedAt);
-        const first = i === 0 || groupOf(items[i - 1].updatedAt) !== group;
+        const group = groupFor(c);
+        const first = i === 0 || groupFor(items[i - 1]) !== group;
         return (
           <Fragment key={c.id}>
             {first && <div className="group-label">{group}</div>}

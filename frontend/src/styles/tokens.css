@@ -3,7 +3,8 @@
    Every scheme defines the full token set twice: light, then dark. The attributes can sit on any
    element (the swatches in Settings use that), so the first pair also answers to [data-scheme="klean"]. */
 :root{
-  --ui:"Instrument Sans",system-ui,sans-serif; --prose:"Newsreader",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  /* --prose (responses), --prompt and --mono (code) are the user's to change: FONT_ROLES in config.ts, whose defaults match these */
+  --ui:"Instrument Sans",system-ui,sans-serif; --prose:"Newsreader",Georgia,serif; --prompt:"Instrument Sans",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
   --ease:cubic-bezier(.2,.8,.2,1); --sidebar:280px; --art:clamp(380px,40vw,680px);
 }
 :root,[data-scheme="klean"]{
@@ -86,3 +87,14 @@
   --t-key:#FF9E8A; --t-str:#8FE8A8; --t-num:#FFCF70; --t-com:#A6A6A6; --t-fn:#8CC8FF;
   color-scheme:dark;
 }
+/* ---------- code colours ----------
+   Chosen apart from the scheme (CODE_SCHEMES in config.ts); "default" has no block here and keeps the scheme's own.
+   Only the syntax tokens change; the code background stays the scheme's. These come after the schemes, so they win. */
+[data-code-scheme="github"]{--t-key:#CF222E; --t-str:#0A3069; --t-num:#0550AE; --t-com:#6E7781; --t-fn:#8250DF}
+[data-code-scheme="github"][data-theme="dark"]{--t-key:#FF7B72; --t-str:#A5D6FF; --t-num:#79C0FF; --t-com:#8B949E; --t-fn:#D2A8FF}
+[data-code-scheme="one"]{--t-key:#A626A4; --t-str:#50A14F; --t-num:#986801; --t-com:#A0A1A7; --t-fn:#4078F2}
+[data-code-scheme="one"][data-theme="dark"]{--t-key:#C678DD; --t-str:#98C379; --t-num:#D19A66; --t-com:#7F848E; --t-fn:#61AFEF}
+[data-code-scheme="solarized"]{--t-key:#859900; --t-str:#2AA198; --t-num:#D33682; --t-com:#93A1A1; --t-fn:#268BD2}
+[data-code-scheme="solarized"][data-theme="dark"]{--t-key:#859900; --t-str:#2AA198; --t-num:#D33682; --t-com:#657B83; --t-fn:#268BD2}
+[data-code-scheme="gruvbox"]{--t-key:#9D0006; --t-str:#79740E; --t-num:#8F3F71; --t-com:#928374; --t-fn:#B57614}
+[data-code-scheme="gruvbox"][data-theme="dark"]{--t-key:#FB4934; --t-str:#B8BB26; --t-num:#D3869B; --t-com:#928374; --t-fn:#FABD2F}

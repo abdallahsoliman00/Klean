@@ -3,10 +3,10 @@
 - [x] Add configurations where the user saves a group of temperature settings, model used, context window and system prompt, all together.
 - [x] Make the configuration sticky. i.e. let the configuration previously set be the same for the next chat.
 - [x] Make the artifacts side panel resizable and give it fullscreen.
-- [ ] Make it possible to run multiple chats in parallel. If I exit a chat without explicitly stopping token straming, then keep that running in the background where I can later enter and continue.
+- [x] Make it possible to run multiple chats in parallel. If I exit a chat without explicitly stopping token straming, then keep that running in the background where I can later enter and continue.
 - [x] When switching models in the middle of a conversation, find out which model is the one actually doing the talking.
 - [x] If an agent loops for too long, it stops. Give it a longer loop time or make it adjustable through a config.
-- [ ] Make older versions of the artifacts also visible. Give me a tab to select which one. Currently, the user can only select the most recent update of the artifact.
+- [x] Make older versions of the artifacts also visible. Give me a tab to select which one. Currently, the user can only select the most recent update of the artifact.
 
 # New features
 - [x] Make the context window larger than 128k tokens.
@@ -19,10 +19,10 @@
     - Web search
 - [ ] Make code syntax highlighting work even in the chat box. (Where if you type ``` in the prompt box you get syntax highlighting.)
 - [x] Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available. (Five schemes, each light and dark, in Settings → Appearance.)
-- [ ] Give the user the option to select from different code coloschemes as well.
-- [ ] Favourite chats.
-- [ ] Artifacts panel with all artifacts ever created. (in the panel below new chat)
-- [ ] Load old artifacts and continue working on them. (Either load multiple together in the same chat or go to the old chat where it was originally created)
+- [x] Give the user the option to select from different code coloschemes as well.
+- [x] Favourite chats.
+- [x] Artifacts panel with all artifacts ever created. (in the panel below new chat)
+- [x] Load old artifacts and continue working on them. (Either load multiple together in the same chat or go to the old chat where it was originally created)
 - [ ] Use a patch method for the LLM to update an artifact instead of rewriting the entire file from scratch. This can be done by the LLM writing the EXACT text to match against and writing the replacement, both in the tool call. An edge case may arise if a document has lots of repeating text, so to mitigate that risk, the part to patch should be a UNIQUE section.
 - [x] Allow for multiple system prompts. (Save system prompts to database where all you do is load the system prompt and reuse it.)
 - [ ] Make the application download the most recent version of the tool if one is available. (In other words, auto update the app)
@@ -38,7 +38,7 @@
 - [ ] Add MCPs
 - [x] Use either https://github.com/eKoopmans/html2pdf.js or https://github.com/SanzarRehman/HTML2PDF for html to pdf rendering for downloading.
 - [ ] Make an electron-based version to make it easier to use. This larger version can include a backend with a sandbox for command execution.
-- [ ] Add different font options
+- [x] Add different font options
 
 # Repo Admin
 - [x] Change the name to something more interesting than switchboard. (Now Klean.)

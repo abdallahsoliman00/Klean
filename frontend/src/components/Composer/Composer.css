@@ -6,7 +6,7 @@
 .jump.show{opacity:1;visibility:visible;transform:translate(-50%,0)}
 .box{position:relative;background:var(--raised);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);transition:border-color .15s,box-shadow .2s}
 .box:focus-within{border-color:var(--faint)}
-.box textarea{display:block;width:100%;border:0;outline:none;resize:none;background:transparent;padding:15px 16px 4px;line-height:1.5;max-height:240px;font-size:15px}
+.box textarea{font-family:var(--prompt);display:block;width:100%;border:0;outline:none;resize:none;background:transparent;padding:15px 16px 4px;line-height:1.5;max-height:240px;font-size:15px}
 .box textarea::placeholder{color:var(--faint)}
 .box-row{display:flex;align-items:center;gap:6px;padding:6px 8px 8px 10px}
 .chip{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;color:var(--muted);font-size:12.5px}

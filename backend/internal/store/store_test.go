@@ -61,6 +61,61 @@ func TestOldDatabaseIsMigrated(t *testing.T) {
 	}
 }
 
+func TestArtifactVersions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := db.CreateChat(NewChat{})
+	a, err := db.CreateArtifact(c.ID, "one", "code", "go", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	title := "two"
+	if _, err := db.UpdateArtifact(c.ID, a.ID, "v2", &title); err != nil {
+		t.Fatal(err)
+	}
+	vs, err := db.ArtifactVersions(a.ID)
+	if err != nil || len(vs) != 2 || *vs[0] != (ArtifactVersion{1, "one", "v1", a.CreatedAt}) ||
+		vs[1].Version != 2 || vs[1].Title != "two" || vs[1].Content != "v2" {
+		t.Fatalf("versions: %+v, %v", vs, err)
+	}
+	if lib, err := db.LibraryArtifacts(); err != nil || len(lib) != 1 || lib[0].ChatTitle != c.Title || lib[0].Version != 2 {
+		t.Fatalf("library: %+v, %v", lib, err)
+	}
+
+	// An artifact from before version history gets its current version on open.
+	if _, err := db.sql.Exec("DELETE FROM artifact_versions"); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if db, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if vs, err := db.ArtifactVersions(a.ID); err != nil || len(vs) != 1 || vs[0].Version != 2 || vs[0].Content != "v2" {
+		t.Fatalf("backfilled versions: %+v, %v", vs, err)
+	}
+
+	// Deleting the artifact, or the chat it is in, takes it out of both lists.
+	if _, err := db.DeleteArtifact(a.ID); err != nil {
+		t.Fatal(err)
+	}
+	if vs, err := db.ArtifactVersions(a.ID); err != nil || len(vs) != 0 {
+		t.Fatalf("versions of a deleted artifact: %+v, %v", vs, err)
+	}
+	if _, err := db.CreateArtifact(c.ID, "t", "code", "go", "x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DeleteChat(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if lib, err := db.LibraryArtifacts(); err != nil || len(lib) != 0 {
+		t.Fatalf("library after deleting the chat: %+v, %v", lib, err)
+	}
+}
+
 func TestPartsRoundTrip(t *testing.T) {
 	db, err := Open(filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {

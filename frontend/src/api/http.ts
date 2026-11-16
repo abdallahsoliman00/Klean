@@ -2,7 +2,7 @@
 import { API_ORIGIN, API_PREFIX, ENDPOINTS, PDF_TYPE, REPORT_PDF, STATUS_NO_CONTENT } from '../config';
 import type { Api } from '../types';
 import { errorFromResponse, ApiError, OFFLINE_MESSAGE } from './errors';
-import { streamMessage } from './stream';
+import { attachStream, streamMessage } from './stream';
 
 const ROOT = API_ORIGIN + API_PREFIX;
 
@@ -51,8 +51,12 @@ export const httpApi: Api = {
     remove: (id) => req('DELETE', ENDPOINTS.chat(id)),
     restore: (id) => req('POST', ENDPOINTS.chatRestore(id)),
     send: (chatId, body, cb) => streamMessage(ROOT + ENDPOINTS.chatMessages(chatId), body, cb),
+    attach: (chatId, cb) => attachStream(ROOT + ENDPOINTS.chatStream(chatId), cb),
+    stop: (chatId) => req('POST', ENDPOINTS.chatStop(chatId)),
   },
   artifacts: {
+    list: () => req('GET', ENDPOINTS.artifacts),
+    versions: (id) => req('GET', ENDPOINTS.artifactVersions(id)),
     remove: (id) => req('DELETE', ENDPOINTS.artifact(id)),
     pdf: (id) => pdf(ENDPOINTS.artifactPdf(id)),
   },

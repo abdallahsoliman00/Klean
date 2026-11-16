@@ -5,7 +5,7 @@ import { systemPromptInput } from '../lib/focus';
 import { isMobile } from '../lib/media';
 import type { Slice } from './types';
 
-export type Overlay = 'palette' | 'chatPanel' | 'settings';
+export type Overlay = 'palette' | 'chatPanel' | 'settings' | 'library';
 
 /** What the settings modal shows: a provider (id null = "Add a provider"), or an app page. */
 export type SettingsPage = { kind: 'provider'; id: string | null } | { kind: 'appearance' } | { kind: 'search' } | { kind: 'skills' };
@@ -36,6 +36,8 @@ export interface UiSlice {
   setSettingsPage(p: SettingsPage): void;
   openPalette(): void;
   openChatPanel(): void;
+  /** The artifacts library: every artifact in every chat. */
+  openLibrary(): void;
   togglePalette(): void;
   togglePopover(id: string, anchor: HTMLElement): void;
   closePopover(refocus?: boolean): void;
@@ -92,6 +94,10 @@ export const createUiSlice: Slice<UiSlice> = (set, get) => ({
   openChatPanel() {
     get().showOverlay('chatPanel');
     setTimeout(() => systemPromptInput.current?.focus(), CHAT_PANEL_FOCUS_MS);
+  },
+  openLibrary() {
+    get().closeMobile();
+    get().showOverlay('library');
   },
   togglePalette() {
     if (get().overlay === 'palette') get().hideAll();

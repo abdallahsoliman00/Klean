@@ -12,3 +12,13 @@ export function groupOf(ts: number): string {
   if (diff < MONTH_DAYS) return 'Previous 30 days';
   return 'Older';
 }
+
+const UNITS = [['year', 365 * DAY_MS], ['month', MONTH_DAYS * DAY_MS], ['day', DAY_MS], ['hour', DAY_MS / 24], ['minute', DAY_MS / 1440]] as const;
+const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+
+/** "5 minutes ago", "yesterday", "last month". */
+export function timeAgo(ts: number): string {
+  const diff = ts - Date.now();
+  const [unit, size] = UNITS.find(([, ms]) => Math.abs(diff) >= ms) ?? ['minute', 0];
+  return size ? relative.format(Math.round(diff / size), unit) : 'just now';
+}

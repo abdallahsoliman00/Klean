@@ -6,9 +6,10 @@
 <title>Klean</title>
 <meta name="theme-color" id="themeColor" content="#E9ECF0">
 <script>
-/* mode and colour scheme, applied before first paint (the %…% values come from src/config.ts) */
-(function(){var d=document.documentElement,t=%DEFAULT_THEME%,s=%DEFAULT_SCHEME%;try{t=localStorage.getItem(%THEME_KEY%)||t;s=localStorage.getItem(%SCHEME_KEY%)||s}catch(e){}
-d.dataset.scheme=s;d.dataset.theme=t==='dark'||(t!=='light'&&matchMedia(%DARK_QUERY%).matches)?'dark':'light'})();
+/* mode, colour scheme, code colours and fonts, applied before first paint (the %…% values come from src/config.ts) */
+(function(){var d=document.documentElement,t=%DEFAULT_THEME%,s=%DEFAULT_SCHEME%,c=%DEFAULT_CODE_SCHEME%,f={},V=%FONT_VARS%,S=%FONT_STACKS%,r;try{t=localStorage.getItem(%THEME_KEY%)||t;s=localStorage.getItem(%SCHEME_KEY%)||s;c=localStorage.getItem(%CODE_SCHEME_KEY%)||c;f=JSON.parse(localStorage.getItem(%FONTS_KEY%))||f}catch(e){}
+for(r in V)if(S.hasOwnProperty(f[r]))d.style.setProperty(V[r],S[f[r]]);
+d.dataset.codeScheme=c;d.dataset.scheme=s;d.dataset.theme=t==='dark'||(t!=='light'&&matchMedia(%DARK_QUERY%).matches)?'dark':'light'})();
 </script>
 <link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect width='22' height='22' rx='7' fill='%231A1F27'/%3E%3Crect x='5' y='7' width='8' height='2' rx='1' fill='%23fff'/%3E%3Crect x='9' y='13' width='8' height='2' rx='1' fill='%23fff'/%3E%3C/svg%3E">
 <script type="module" src="/src/main.tsx"></script>

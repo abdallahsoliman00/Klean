@@ -127,8 +127,12 @@ func run() error {
 	}
 	defer db.Close()
 
+	api := server.New(db, static, env("KLEAN_CORS", config.DefaultCORSOrigins), server.WithBrowser(browser))
+	// On the way out the replies still being written are stopped, and what
+	// they had is saved before the database closes.
+	defer api.Close()
 	srv := &http.Server{
-		Handler:           server.New(db, static, env("KLEAN_CORS", config.DefaultCORSOrigins), server.WithBrowser(browser)),
+		Handler:           api,
 		ReadHeaderTimeout: config.ReadHeaderTimeout,
 	}
 	fmt.Printf("\n  Klean is running at %s\n  Database: %s\n", url, *dbPath)

@@ -1,7 +1,11 @@
-/* Mode (system / light / dark) and colour scheme are separate choices. Both are attributes on <html>;
-   the token blocks in styles/tokens.css do the rest. index.html applies them before first paint. */
-import { DARK_QUERY, DEFAULT_SCHEME, DEFAULT_THEME, SCHEMES, STORAGE_KEYS, THEME_PREFS, type SchemeId, type ThemePref } from '../config';
-import { readString } from './storage';
+/* Mode (system / light / dark), colour scheme and code colours are separate choices, each an attribute on
+   <html>; the token blocks in styles/tokens.css do the rest. Fonts are custom properties on <html>.
+   index.html applies them all before first paint. */
+import {
+  CODE_SCHEMES, DARK_QUERY, DEFAULT_CODE_SCHEME, DEFAULT_SCHEME, DEFAULT_THEME, FONT_ROLES, FONT_STACKS, SCHEMES, STORAGE_KEYS, THEME_PREFS,
+  type CodeSchemeId, type FontChoices, type FontId, type SchemeId, type ThemePref,
+} from '../config';
+import { readJson, readString } from './storage';
 
 export function storedThemePref(): ThemePref {
   const v = readString(STORAGE_KEYS.theme);
@@ -11,6 +15,25 @@ export function storedThemePref(): ThemePref {
 export function storedScheme(): SchemeId {
   const v = readString(STORAGE_KEYS.scheme);
   return SCHEMES.some((s) => s.id === v) ? (v as SchemeId) : DEFAULT_SCHEME;
+}
+
+export function storedCodeScheme(): CodeSchemeId {
+  const v = readString(STORAGE_KEYS.codeScheme);
+  return CODE_SCHEMES.some((s) => s.id === v) ? (v as CodeSchemeId) : DEFAULT_CODE_SCHEME;
+}
+
+/** Each role's remembered font, or its default (the first on offer) when there is none or it is no longer offered. */
+export function storedFonts(): FontChoices {
+  const saved = readJson<Partial<Record<string, FontId>>>(STORAGE_KEYS.fonts);
+  const pick = (r: (typeof FONT_ROLES)[number]) => r.options.find((f) => f === saved?.[r.id]) ?? r.options[0];
+  return Object.fromEntries(FONT_ROLES.map((r) => [r.id, pick(r)])) as FontChoices;
+}
+
+/** Points each role's CSS variable at its font, and <html> at the code colours. */
+export function applyCodeAndFonts(fonts: FontChoices, codeScheme: CodeSchemeId) {
+  const root = document.documentElement;
+  root.dataset.codeScheme = codeScheme;
+  for (const r of FONT_ROLES) root.style.setProperty(r.cssVar, FONT_STACKS[fonts[r.id]]);
 }
 
 export const prefersDark = () => matchMedia(DARK_QUERY).matches;

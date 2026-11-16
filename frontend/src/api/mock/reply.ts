@@ -1,7 +1,7 @@
 /* The mock's replies: plain text, or a scripted tool call when the message has a trigger word. */
 import { MOCK_LATENCY, type ToolGroup } from '../../config';
 import type { Artifact, Part, SendCallbacks, ToolArgs, ToolPart } from '../../types';
-import { artifacts, replies, SAMPLE, searchResults, skills, uid, type MockChat } from './data';
+import { artifacts, olderVersions, replies, SAMPLE, searchResults, skills, uid, type MockChat } from './data';
 import { SAMPLE_REPORT } from './report';
 import { sleep } from './helpers';
 
@@ -99,6 +99,7 @@ export async function scriptedReply({ chat, prompt, images, answered, tools, cb 
       await say('Revising the most recent one.\n\n');
       await tool('update_artifact', { id: a ? a.id : 'missing', content: '…' }, () => {
         if (!a) throw new Error('There is no artifact in this chat to update.');
+        (olderVersions[a.id] ??= []).push({ version: a.version, title: a.title, content: a.content, createdAt: a.updatedAt });
         const stamp = new Date().toLocaleTimeString();
         a.content =
           a.kind === 'html' ? a.content.replace(/<h1>[^<]*<\/h1>/, `<h1>Tide table, revised ${stamp}</h1>`)

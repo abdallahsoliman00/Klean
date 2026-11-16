@@ -1,9 +1,9 @@
-/* Choices remembered in the browser: mode, colour scheme, which tools the model may use, and the
-   artifact panel's width. */
-import { ART_WIDTH, STORAGE_KEYS, TOOL_GROUPS, type SchemeId, type ThemePref, type ToolGroup } from '../config';
+/* Choices remembered in the browser: mode, colour scheme, fonts, code colours, which tools the model
+   may use, and the artifact panel's width. */
+import { ART_WIDTH, STORAGE_KEYS, TOOL_GROUPS, type CodeSchemeId, type FontChoices, type FontId, type FontRole, type SchemeId, type ThemePref, type ToolGroup } from '../config';
 import { maxArtifactWidth } from '../lib/media';
 import { readJson, writeJson, writeString } from '../lib/storage';
-import { storedScheme, storedThemePref } from '../lib/theme';
+import { storedCodeScheme, storedFonts, storedScheme, storedThemePref } from '../lib/theme';
 import type { Slice } from './types';
 
 export type ToolSwitches = Record<ToolGroup, boolean>;
@@ -11,11 +11,17 @@ export type ToolSwitches = Record<ToolGroup, boolean>;
 export interface PreferencesSlice {
   themePref: ThemePref;
   scheme: SchemeId;
+  /** The font of responses, prompts and code. */
+  fonts: FontChoices;
+  /** Syntax-highlighting colours, chosen apart from the colour scheme. */
+  codeScheme: CodeSchemeId;
   tools: ToolSwitches;
   /** The artifact panel's width in px once the user has resized it; null means the built-in width. */
   artWidth: number | null;
   setThemePref(v: ThemePref): void;
   setScheme(v: SchemeId): void;
+  setFont(role: FontRole, font: FontId): void;
+  setCodeScheme(v: CodeSchemeId): void;
   toggleTool(key: ToolGroup): void;
   /** Sets the artifact panel's width, kept within its limits and this window. */
   setArtWidth(px: number): void;
@@ -38,6 +44,8 @@ function storedArtWidth(): number | null {
 export const createPreferencesSlice: Slice<PreferencesSlice> = (set, get) => ({
   themePref: storedThemePref(),
   scheme: storedScheme(),
+  fonts: storedFonts(),
+  codeScheme: storedCodeScheme(),
   tools: storedTools(),
   artWidth: storedArtWidth(),
 
@@ -48,6 +56,15 @@ export const createPreferencesSlice: Slice<PreferencesSlice> = (set, get) => ({
   setScheme(scheme) {
     writeString(STORAGE_KEYS.scheme, scheme);
     set({ scheme });
+  },
+  setFont(role, font) {
+    const fonts = { ...get().fonts, [role]: font };
+    writeJson(STORAGE_KEYS.fonts, fonts);
+    set({ fonts });
+  },
+  setCodeScheme(codeScheme) {
+    writeString(STORAGE_KEYS.codeScheme, codeScheme);
+    set({ codeScheme });
   },
   toggleTool(key) {
     const tools = { ...get().tools, [key]: !get().tools[key] };

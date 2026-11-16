@@ -22,7 +22,11 @@ export const ENDPOINTS = {
   chat: (id: string) => `/chats/${id}`,
   chatRestore: (id: string) => `/chats/${id}/restore`,
   chatMessages: (id: string) => `/chats/${id}/messages`,
+  chatStream: (id: string) => `/chats/${id}/stream`,
+  chatStop: (id: string) => `/chats/${id}/stop`,
+  artifacts: '/artifacts',
   artifact: (id: string) => `/artifacts/${id}`,
+  artifactVersions: (id: string) => `/artifacts/${id}/versions`,
   artifactPdf: (id: string) => `/artifacts/${id}/pdf`,
   image: (id: string) => `/images/${id}`,
   skills: '/skills',
@@ -32,7 +36,7 @@ export const ENDPOINTS = {
   preset: (id: string) => `/presets/${id}`,
 } as const;
 
-/** HTTP status the backend sends when an answered question is no longer open. */
+/** HTTP status the backend sends when an answered question is no longer open, or the chat is already writing a reply. */
 export const STATUS_CONFLICT = 409;
 /** HTTP status of a reply with no body. */
 export const STATUS_NO_CONTENT = 204;
@@ -52,6 +56,8 @@ export const STORAGE_KEYS = {
   scheme: 'sb:scheme',
   tools: 'sb:tools',
   artWidth: 'sb:artWidth',
+  fonts: 'sb:fonts',
+  codeScheme: 'sb:codeScheme',
 } as const;
 
 /* ---------- appearance ---------- */
@@ -70,6 +76,43 @@ export const SCHEMES = [
 ] as const;
 export type SchemeId = (typeof SCHEMES)[number]['id'];
 export const DEFAULT_SCHEME: SchemeId = 'klean';
+
+/** Syntax-highlighting schemes: id (matches [data-code-scheme] in styles/tokens.css), name, one-line description.
+    The first follows the colour scheme above; the others bring their own light and dark token colours. */
+export const CODE_SCHEMES = [
+  { id: 'default', name: 'Default', note: 'Follows the colour scheme' },
+  { id: 'github', name: 'GitHub', note: 'GitHub Light and Dark' },
+  { id: 'one', name: 'One', note: 'Atom One Light and One Dark' },
+  { id: 'solarized', name: 'Solarized', note: 'Solarized Light and Dark' },
+  { id: 'gruvbox', name: 'Gruvbox', note: 'Gruvbox Light and Dark' },
+] as const;
+export type CodeSchemeId = (typeof CODE_SCHEMES)[number]['id'];
+export const DEFAULT_CODE_SCHEME: CodeSchemeId = 'default';
+
+/** Font stacks by id. Only bundled fonts (styles/fonts.css) and fonts already on the device: nothing is downloaded. */
+export const FONT_STACKS = {
+  instrument: '"Instrument Sans",system-ui,sans-serif',
+  newsreader: '"Newsreader",Georgia,serif',
+  jetbrains: '"JetBrains Mono",ui-monospace,monospace',
+  sans: 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
+  serif: 'ui-serif,Georgia,Cambria,"Times New Roman",serif',
+  mono: 'ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,"Liberation Mono",monospace',
+  courier: '"Courier New",Courier,monospace',
+} as const;
+export type FontId = keyof typeof FONT_STACKS;
+export const FONT_NAMES: Record<FontId, string> = {
+  instrument: 'Instrument Sans', newsreader: 'Newsreader', jetbrains: 'JetBrains Mono',
+  sans: 'System sans-serif', serif: 'System serif', mono: 'System monospace', courier: 'Courier',
+};
+const TEXT_FONTS: readonly FontId[] = ['newsreader', 'instrument', 'sans', 'serif', 'mono'];
+/** What each font choice applies to: the CSS variable it sets (styles/tokens.css), its default (the first option) and the fonts on offer. */
+export const FONT_ROLES = [
+  { id: 'response', name: 'Responses', note: 'What the assistant writes.', cssVar: '--prose', options: TEXT_FONTS },
+  { id: 'prompt', name: 'Prompts', note: 'The message box and the messages you send.', cssVar: '--prompt', options: ['instrument', ...TEXT_FONTS.filter((f) => f !== 'instrument')] },
+  { id: 'code', name: 'Code', note: 'Code blocks, inline code and the artifact code view.', cssVar: '--mono', options: ['jetbrains', 'mono', 'courier'] },
+] as const satisfies readonly { id: string; name: string; note: string; cssVar: string; options: readonly FontId[] }[];
+export type FontRole = (typeof FONT_ROLES)[number]['id'];
+export type FontChoices = Record<FontRole, FontId>;
 
 /** Breakpoints; keep in step with the @media rules in the CSS. */
 export const ART_OVERLAY_QUERY = '(max-width:1100px)'; // artifact panel slides over the thread
@@ -121,6 +164,7 @@ export const PALETTE_FOCUS_MS = 30;
 export const ART_FOCUS_MS = 60; // focus the artifact switcher after opening
 export const ART_CLEAR_MS = 340; // empty the artifact view once the panel has slid out
 export const DOWNLOAD_REVOKE_MS = 1000;
+export const RUNNING_POLL_MS = 2000; // the chat list is refreshed this often, only while some chat is writing a reply
 
 /* ---------- layout ---------- */
 
@@ -139,6 +183,8 @@ export const ART_WIDTH = { min: 380, max: 1400, step: 24, maxShare: 0.6, initial
 export const MAX_ASK_OPTIONS = 4;
 export const MAX_HIGHLIGHT_CHARS = 300000; // bigger artifacts show as plain text
 export const MAX_FILENAME_CHARS = 80;
+/** Up to this many versions of an artifact show as tabs; more become a menu. */
+export const MAX_VERSION_TABS = 4;
 /** Matches the backend's limit on a preset's name. */
 export const PRESET_NAME_MAX_CHARS = 80;
 
@@ -168,8 +214,6 @@ export const TOOLS_UNSUPPORTED_MARK = "doesn't appear to support tools";
 
 /** Id of the user message shown before the backend confirms it. */
 export const PENDING_MESSAGE_ID = 'tmp';
-/** Prefix for the id of a reply that was stopped before the backend finished it. */
-export const LOCAL_MESSAGE_PREFIX = 'local-';
 
 /* ---------- tools and search ---------- */
 

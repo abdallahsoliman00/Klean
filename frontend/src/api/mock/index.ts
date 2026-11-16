@@ -1,5 +1,6 @@
 /* In-memory stand-in for the backend, for working on the UI alone: `npm run dev:mock`.
-   Same method names and shapes as the HTTP client. Put one of these words in a message to see
+   Same method names and shapes as the HTTP client. Like the backend, it goes on writing a reply after the
+   page stops following it (another chat is opened), until it is done or stopped. Put one of these words in a message to see
    the matching tool UI (same words as the backend's fake provider, plus a few extras marked *):
      /artifact  /code  /svg  /md*  /report  /update  /ask  /askmany*  /search  /fetch  /fail*  /skill <name>
    NOIMAGES makes the model refuse a message with images, and /notools* makes it refuse tools.
@@ -9,16 +10,53 @@ import {
   IMAGE_TYPES, KEYLESS_SEARCH_PROVIDER, MAX_IMAGE_BYTES, MAX_IMAGES_PER_MESSAGE, MOCK_LATENCY, PRESET_NAME_MAX_CHARS, REPORT_KIND, SEARCH_PROVIDERS,
   SKILL_DESCRIPTION_MAX_CHARS, SKILL_INSTRUCTIONS_MAX_CHARS, SKILL_NAME_MAX_CHARS, STATUS_BAD_GATEWAY, STATUS_CONFLICT, STATUS_INVALID, STATUS_NOT_FOUND, STATUS_NOT_IMPLEMENTED,
 } from '../../config';
-import type { Api, AppSettings, ChatConfig, ImageInput, Message, MessageImage, PresetInput, Provider, SendCallbacks, Skill, SkillInput, ToolPart } from '../../types';
+import type { Api, AppSettings, ChatConfig, ImageInput, Message, MessageImage, PresetInput, Provider, SendCallbacks, SendResult, Skill, SkillInput, ToolPart } from '../../types';
 import { ApiError } from '../errors';
-import { artifacts, chats, images, presets, providers, skills, uid, type MockChat, type MockProvider } from './data';
+import { artifacts, chats, images, olderVersions, presets, providers, skills, uid, type MockChat, type MockProvider } from './data';
 import { dropArtifacts, sleep, toolParts } from './helpers';
 import { scriptedReply } from './reply';
 import { mockPdf } from './report';
 
 const settings: AppSettings = { searchProvider: KEYLESS_SEARCH_PROVIDER, hasSearchKey: false, chatDefaults: null };
 const trash: Record<string, MockChat> = {};
-const strip = ({ messages: _, ...rest }: MockChat) => ({ ...rest });
+
+/** A reply being written. Its events are kept, so whoever starts following later gets them all from the start. */
+interface Run {
+  log: [(typeof REPLAYED)[number], unknown][];
+  followers: Set<SendCallbacks>;
+  /** Aborted by chats.stop. */
+  stop: AbortController;
+  end: Promise<SendResult>;
+}
+const REPLAYED = ['onToken', 'onToolStart', 'onToolRun', 'onToolEnd', 'onArtifact'] as const;
+const runs = new Map<string, Run>();
+
+/** Callbacks that record each event of a run and pass it to everyone following. */
+function recorder(run: Run): SendCallbacks {
+  const cb: SendCallbacks = { signal: run.stop.signal };
+  for (const k of REPLAYED)
+    cb[k] = (arg: any) => {
+      run.log.push([k, arg]);
+      for (const f of run.followers) f[k]?.(arg);
+    };
+  return cb;
+}
+
+/** Replays a run to `cb`, then passes on what follows until it ends. Rejects with an AbortError when `cb` stops following. */
+async function follow(run: Run, cb: SendCallbacks): Promise<SendResult> {
+  cb.signal?.throwIfAborted();
+  for (const [k, arg] of run.log) (cb[k] as ((a: unknown) => void) | undefined)?.(arg);
+  run.followers.add(cb);
+  const left = new Promise<never>((_, reject) => cb.signal?.addEventListener('abort', () => reject(new DOMException('No longer following.', 'AbortError')), { once: true }));
+  left.catch(() => {}); // leaving after the run has ended is not an error
+  try {
+    return await Promise.race([run.end, left]);
+  } finally {
+    run.followers.delete(cb);
+  }
+}
+
+const strip = ({ messages: _, ...rest }: MockChat) => ({ ...rest, running: runs.has(rest.id) });
 const pub = (p: MockProvider): Provider => ({ id: p.id, name: p.name, baseUrl: p.baseUrl, hasKey: p.hasKey });
 const mustChat = (id: string) => {
   const c = chats.find((x) => x.id === id);
@@ -68,10 +106,10 @@ function storeImages(list: ImageInput[] = []): MessageImage[] {
   });
 }
 /** Like the backend: a title that sums the chat up follows once the reply is done. */
-async function sendSummaryTitle(c: MockChat, prompt: string, cb: SendCallbacks) {
+async function sendSummaryTitle(c: MockChat, prompt: string, followers: SendCallbacks[]) {
   await sleep(MOCK_LATENCY.title);
   c.title = 'About ' + prompt.replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' ').toLowerCase();
-  cb.onTitle?.(c.title);
+  for (const f of followers) if (!f.signal?.aborted) f.onTitle?.(c.title);
 }
 const random = ([base, extra]: readonly [number, number]) => base + Math.random() * extra;
 
@@ -114,12 +152,12 @@ export const mockApi: Api = {
     async get(id) {
       await sleep(MOCK_LATENCY.read);
       const c = chats.find((x) => x.id === id);
-      return c ? structuredClone({ ...c, artifacts: artifacts.filter((a) => a.chatId === id) }) : null;
+      return c ? structuredClone({ ...c, running: runs.has(id), artifacts: artifacts.filter((a) => a.chatId === id) }) : null;
     },
     async create(data) {
-      const c: MockChat = { id: uid(), title: 'New chat', updatedAt: Date.now(), systemPrompt: '', temperature: 0.7, contextWindow: 8192, messages: [], ...data };
+      const c: MockChat = { id: uid(), title: 'New chat', favorite: false, updatedAt: Date.now(), systemPrompt: '', temperature: 0.7, contextWindow: 8192, messages: [], ...data };
       chats.push(c);
-      return structuredClone({ ...c, artifacts: [] });
+      return structuredClone({ ...c, running: false, artifacts: [] });
     },
     async update(id, patch) {
       const c = mustChat(id);
@@ -144,6 +182,7 @@ export const mockApi: Api = {
     async send(id, body, cb = {}) {
       const { content, providerId, model, editMessageId, regenerate, answer } = body;
       const c = mustChat(id);
+      if (runs.has(id)) throw new ApiError('This chat is already writing a reply.', STATUS_CONFLICT);
       let attached = storeImages(body.images);
       let prompt = content || '';
       let answered: string | null = null;
@@ -179,24 +218,57 @@ export const mockApi: Api = {
         titled = content ? content.replace(/\s+/g, ' ').slice(0, 42).trim() + (content.length > 42 ? '…' : '') : 'Image';
         c.title = titled;
       }
-      const p = providers.find((x) => x.id === providerId);
-      await sleep(random(MOCK_LATENCY.firstToken));
-      if (!p || p.offline) throw new ApiError(`${p ? p.name : 'Provider'} didn't respond at ${p ? p.baseUrl : ''}. Start the server or pick another model.`);
+      // from here on the reply is written whether or not anyone follows it
+      const run: Run = { log: [], followers: new Set(), stop: new AbortController(), end: null! };
+      const write = async (): Promise<SendResult> => {
+        const p = providers.find((x) => x.id === providerId);
+        await sleep(random(MOCK_LATENCY.firstToken));
+        if (!p || p.offline) throw new ApiError(`${p ? p.name : 'Provider'} didn't respond at ${p ? p.baseUrl : ''}. Start the server or pick another model.`);
 
-      const seen = c.messages.findLast((m) => m.role === 'user')?.images?.length ?? 0;
-      if (seen && prompt.includes('NOIMAGES')) throw new ApiError("This model or server can't read images. Pick a model with vision support, or send the message without the images.");
-      if (prompt.includes('/notools') && (body.tools.length || skills.some((s) => s.enabled)))
-        throw new ApiError("This model or provider doesn't appear to support tools. Turn tools off in the composer and send the message again.");
+        const seen = c.messages.findLast((m) => m.role === 'user')?.images?.length ?? 0;
+        if (seen && prompt.includes('NOIMAGES')) throw new ApiError("This model or server can't read images. Pick a model with vision support, or send the message without the images.");
+        if (prompt.includes('/notools') && (body.tools.length || skills.some((s) => s.enabled)))
+          throw new ApiError("This model or provider doesn't appear to support tools. Turn tools off in the composer and send the message again.");
 
-      const parts = await scriptedReply({ chat: c, prompt, images: seen, answered, tools: new Set(body.tools), cb });
-      const stopped = !!cb.signal?.aborted;
-      const am: Message = { id: uid(), role: 'assistant', model, content: parts.map((x) => (x.type === 'text' ? x.text : '')).join(''), parts, stopped, createdAt: Date.now() };
-      if (parts.length) c.messages.push(am);
-      if (titled && prompt && !stopped) void sendSummaryTitle(c, prompt, cb);
-      return structuredClone({ message: am, title: titled });
+        const parts = await scriptedReply({ chat: c, prompt, images: seen, answered, tools: new Set(body.tools), cb: recorder(run) });
+        const stopped = run.stop.signal.aborted;
+        const am: Message = { id: uid(), role: 'assistant', model, content: parts.map((x) => (x.type === 'text' ? x.text : '')).join(''), parts, stopped, createdAt: Date.now() };
+        if (parts.length) c.messages.push(am);
+        c.updatedAt = Date.now();
+        if (titled && prompt && !stopped) void sendSummaryTitle(c, prompt, [...run.followers]);
+        return structuredClone({ message: am, title: titled });
+      };
+      run.end = write().finally(() => runs.delete(id));
+      run.end.catch(() => {}); // a failure nobody is following is not an unhandled one
+      runs.set(id, run);
+      return follow(run, cb);
+    },
+    async attach(id, cb = {}) {
+      const run = runs.get(id);
+      return run ? follow(run, cb) : null;
+    },
+    async stop(id) {
+      const run = runs.get(id);
+      run?.stop.abort();
+      await run?.end.catch(() => {});
     },
   },
   artifacts: {
+    async list() {
+      await sleep(MOCK_LATENCY.read);
+      return artifacts
+        .flatMap(({ content: _, chatId = '', ...a }) => {
+          const chat = chats.find((c) => c.id === chatId); // a deleted chat's artifacts are left out
+          return chat ? [{ ...a, chatId, chatTitle: chat.title }] : [];
+        })
+        .toSorted((a, b) => b.updatedAt - a.updatedAt);
+    },
+    async versions(id) {
+      await sleep(MOCK_LATENCY.read);
+      const a = artifacts.find((x) => x.id === id);
+      if (!a) throw new ApiError('Artifact not found.', STATUS_NOT_FOUND);
+      return structuredClone([...(olderVersions[id] ?? []), { version: a.version, title: a.title, content: a.content, createdAt: a.updatedAt }]);
+    },
     async remove(id) {
       await sleep(MOCK_LATENCY.read);
       const i = artifacts.findIndex((a) => a.id === id);

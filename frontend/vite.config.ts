@@ -1,15 +1,20 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
-import { API_PREFIX, DARK_QUERY, DEFAULT_SCHEME, DEFAULT_THEME, DEV_BACKEND_URL, STORAGE_KEYS } from './src/config.ts';
+import { API_PREFIX, DARK_QUERY, DEFAULT_CODE_SCHEME, DEFAULT_SCHEME, DEFAULT_THEME, DEV_BACKEND_URL, FONT_ROLES, FONT_STACKS, STORAGE_KEYS } from './src/config.ts';
 
 /** Fills the %NAME% placeholders in index.html's pre-paint theme script from src/config.ts. */
 function themeConstants(): Plugin {
-  const values: Record<string, string> = {
+  const values: Record<string, unknown> = {
     DEFAULT_THEME,
     DEFAULT_SCHEME,
     THEME_KEY: STORAGE_KEYS.theme,
     SCHEME_KEY: STORAGE_KEYS.scheme,
     DARK_QUERY,
+    DEFAULT_CODE_SCHEME,
+    CODE_SCHEME_KEY: STORAGE_KEYS.codeScheme,
+    FONTS_KEY: STORAGE_KEYS.fonts,
+    FONT_VARS: Object.fromEntries(FONT_ROLES.map((r) => [r.id, r.cssVar])),
+    FONT_STACKS,
   };
   return {
     name: 'klean-theme-constants',
