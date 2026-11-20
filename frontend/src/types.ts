@@ -28,6 +28,7 @@ export interface ToolArgs {
   kind?: string;
   language?: string;
   content?: string;
+  edits?: { old_text: string; new_text: string }[];
   question?: string;
   multiple?: boolean;
   options?: { label: string; description?: string }[];
@@ -80,6 +81,12 @@ export interface ImageInput {
   data: string;
 }
 
+/** A text file attached to a message, with its whole text. */
+export interface FileInput {
+  name: string;
+  text: string;
+}
+
 /** An image a message carries. Its bytes are at GET /images/:id. */
 export interface MessageImage {
   id: string;
@@ -93,6 +100,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   images?: MessageImage[] | null;
+  files?: FileInput[] | null;
   parts?: Part[] | null;
   model?: string | null;
   stopped?: boolean;
@@ -209,6 +217,7 @@ export interface SettingsPatch extends SearchSettingsPatch {
 export interface SendBody {
   content: string;
   images?: ImageInput[];
+  files?: FileInput[];
   providerId: string | null;
   model: string | null;
   editMessageId?: string;

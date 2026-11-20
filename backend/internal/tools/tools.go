@@ -16,6 +16,7 @@ const (
 	CreateArtifact = "create_artifact"
 	CreateReport   = "create_report"
 	UpdateArtifact = "update_artifact"
+	EditArtifact   = "edit_artifact"
 	AskUser        = "ask_user"
 	WebSearch      = "web_search"
 	FetchPage      = "fetch_page"
@@ -92,12 +93,33 @@ var defs = map[string][]llm.Tool{
 		},
 		{
 			Name: UpdateArtifact,
-			Description: "Replace the content of an artifact or report created earlier in this chat. Send the complete new content, " +
-				"not a diff. The artifact keeps its id and its version goes up by one.",
+			Description: "Replace the whole content of an artifact or report created earlier in this chat. Send the complete " +
+				"new content. Prefer edit_artifact for changes to part of it; use this only to rewrite most of it. " +
+				"The artifact keeps its id and its version goes up by one.",
 			Parameters: object([]string{"id", "content"}, obj{
 				"id":      str("The id that create_artifact or create_report returned."),
 				"content": str("The full new content, replacing the old."),
 				"title":   str("A new title. Leave out to keep the current one."),
+			}),
+		},
+		{
+			Name: EditArtifact,
+			Description: "Change part of an artifact or report created earlier in this chat by replacing exact passages, " +
+				"without resending the rest. Each edit's old_text must be copied exactly from the current content " +
+				"(whitespace and indentation included) and must appear only once in it; include a few surrounding lines " +
+				"when needed to make it unique. Edits apply in order, each to the result of the one before, and if any " +
+				"fails none are applied. All the edits together make one new version.",
+			Parameters: object([]string{"id", "edits"}, obj{
+				"id": str("The id that create_artifact or create_report returned."),
+				"edits": obj{
+					"type": "array", "minItems": 1,
+					"description": "The replacements, applied in order.",
+					"items": object([]string{"old_text", "new_text"}, obj{
+						"old_text": str("A passage of the current content, exactly as it is, that occurs only once."),
+						"new_text": str("The text that replaces it. Empty to delete the passage."),
+					}),
+				},
+				"title": str("A new title. Leave out to keep the current one."),
 			}),
 		},
 	},
@@ -163,7 +185,8 @@ func has(list []string, v string) bool {
 
 var guidance = map[string]string{
 	GroupArtifacts: "Put substantial standalone work (a web page, an SVG, a document, a complete file or script) in an artifact " +
-		"with create_artifact, and change it with update_artifact rather than creating another. Keep short examples, " +
+		"with create_artifact, and change it rather than creating another: edit_artifact for targeted changes, " +
+		"update_artifact only when rewriting most of it. Keep short examples, " +
 		"one-liners and explanations inline in your reply. After creating or updating an artifact, describe it in a " +
 		"sentence or two; don't repeat its content. When the user asks for a report, or a similar formal, printable " +
 		"document, write it with create_report instead: a complete HTML document for A4 portrait print, with inline CSS, " +

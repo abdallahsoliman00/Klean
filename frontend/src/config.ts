@@ -169,7 +169,6 @@ export const RUNNING_POLL_MS = 2000; // the chat list is refreshed this often, o
 /* ---------- layout ---------- */
 
 export const STICK_TO_BOTTOM_PX = 80; // closer than this to the bottom keeps following the stream
-export const COMPOSER_MAX_HEIGHT_PX = 240;
 export const POPOVER_EDGE_PX = 8; // min distance from the window edge
 export const POPOVER_GAP_PX = 6; // between anchor and popover
 export const MENU_GAP_PX = 4;
@@ -195,6 +194,11 @@ export const MAX_IMAGES_PER_MESSAGE = 8;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** Bigger images are shrunk in the browser before upload: the longest side in px, and the JPEG quality. */
 export const IMAGE_DOWNSCALE = { maxSide: 2048, quality: 0.85 } as const;
+
+/* ---------- text files in messages (the backend enforces the same limits) ---------- */
+
+export const MAX_FILES_PER_MESSAGE = 8;
+export const MAX_FILE_BYTES = 512 * 1024;
 
 /* ---------- skills (the backend enforces the same limits) ---------- */
 

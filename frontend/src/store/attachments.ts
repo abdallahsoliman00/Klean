@@ -1,38 +1,55 @@
-/* The images attached to the message being written. */
-import { IMAGE_TYPES, MAX_IMAGES_PER_MESSAGE } from '../config';
+/* The images and text files attached to the message being written. */
+import { IMAGE_TYPES, MAX_FILES_PER_MESSAGE, MAX_IMAGES_PER_MESSAGE } from '../config';
+import { readTextFile } from '../lib/files';
 import { prepareImage } from '../lib/images';
-import type { ImageInput } from '../types';
+import type { FileInput, ImageInput } from '../types';
 import type { Slice } from './types';
 
 export interface Attachment extends ImageInput {
   id: number;
 }
 
+export interface FileAttachment extends FileInput {
+  id: number;
+}
+
 export interface AttachmentsSlice {
   attachments: Attachment[];
+  attachedFiles: FileAttachment[];
   /** How many images are still being read or shrunk. */
   attaching: number;
-  /** Attaches the images among these files; says why when some can't be. */
+  /** Attaches these files: images as images, anything else as text; says why when some can't be. */
   attachFiles(files: Iterable<File>): Promise<void>;
   removeAttachment(id: number): void;
-  setAttachments(images: ImageInput[]): void;
+  removeFile(id: number): void;
+  setAttachments(images: ImageInput[], files?: FileInput[]): void;
 }
 
 let nextId = 1;
-const withId = (image: ImageInput): Attachment => ({ ...image, id: nextId++ });
+const withId = <T>(item: T): T & { id: number } => ({ ...item, id: nextId++ });
 
 export const createAttachmentsSlice: Slice<AttachmentsSlice> = (set, get) => ({
   attachments: [],
+  attachedFiles: [],
   attaching: 0,
 
   async attachFiles(files) {
     const all = [...files];
     let images = all.filter((f) => IMAGE_TYPES.includes(f.type));
-    if (images.length < all.length) get().toast('Only PNG, JPEG, WebP and GIF images can be attached.');
+    let texts = all.filter((f) => !IMAGE_TYPES.includes(f.type));
     const room = MAX_IMAGES_PER_MESSAGE - get().attachments.length - get().attaching;
     if (images.length > room) {
       get().toast(`A message can carry up to ${MAX_IMAGES_PER_MESSAGE} images.`);
       images = images.slice(0, Math.max(0, room));
+    }
+    const fileRoom = MAX_FILES_PER_MESSAGE - get().attachedFiles.length;
+    if (texts.length > fileRoom) {
+      get().toast(`A message can carry up to ${MAX_FILES_PER_MESSAGE} files.`);
+      texts = texts.slice(0, Math.max(0, fileRoom));
+    }
+    for (const file of texts) {
+      const read = await readTextFile(file).catch((e: Error) => void get().toast(e.message));
+      if (read) set((s) => ({ attachedFiles: [...s.attachedFiles, withId(read)] }));
     }
     set((s) => ({ attaching: s.attaching + images.length }));
     for (const file of images) {
@@ -46,7 +63,11 @@ export const createAttachmentsSlice: Slice<AttachmentsSlice> = (set, get) => ({
     set((s) => ({ attachments: s.attachments.filter((a) => a.id !== id) }));
   },
 
-  setAttachments(images) {
-    set({ attachments: images.map(withId) });
+  removeFile(id) {
+    set((s) => ({ attachedFiles: s.attachedFiles.filter((f) => f.id !== id) }));
+  },
+
+  setAttachments(images, files = []) {
+    set({ attachments: images.map(withId), attachedFiles: files.map(withId) });
   },
 });

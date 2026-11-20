@@ -17,7 +17,7 @@ export function contextStats(chat: Pick<Chat, 'messages' | 'systemPrompt' | 'con
   if (!chat) return { total: 0, sent: 0, win: DEFAULT_CONTEXT_WINDOW };
   const win = chat.contextWindow || DEFAULT_CONTEXT_WINDOW;
   const sys = estimateTokens(chat.systemPrompt);
-  const toks = chat.messages.map((m) => estimateTokens(m.content) + MESSAGE_OVERHEAD_TOKENS);
+  const toks = chat.messages.map((m) => estimateTokens(m.content) + (m.files ?? []).reduce((n, f) => n + estimateTokens(f.text), 0) + MESSAGE_OVERHEAD_TOKENS);
   const total = sys + toks.reduce((a, b) => a + b, 0);
   const budget = win * HISTORY_BUDGET_SHARE; // leave room for the reply
   let sent = sys;

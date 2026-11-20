@@ -263,6 +263,11 @@ var triggers = []struct {
 		return map[string]any{"id": id, "title": "Demo page (updated)",
 			"content": strings.Replace(demoPage, "Click me", "Click me again", 1)}
 	}},
+	{"/edit", "edit_artifact", func(in input) map[string]any {
+		// "/edit <old> => <new>" replaces <old>; the default swaps the button label.
+		old, repl, _ := strings.Cut(after(in.lastUser, "/edit", "Click me => Press me"), " => ")
+		return map[string]any{"id": in.artifactID, "edits": []map[string]any{{"old_text": old, "new_text": repl}}}
+	}},
 	{"/ask", "ask_user", func(input) map[string]any {
 		return map[string]any{"question": "Which colour should the button be?", "multiple": false, "options": []map[string]any{
 			{"label": "Blue", "description": "Calm and conventional"},

@@ -11,6 +11,7 @@ const FAILURES: Record<string, string> = {
   web_search: 'The web search failed',
   create_artifact: 'Couldn’t create the artifact',
   update_artifact: 'Couldn’t update the artifact',
+  edit_artifact: 'Couldn’t edit the artifact',
   create_report: 'Couldn’t write the report',
   use_skill: 'Couldn’t load the skill',
   ask_user: 'Couldn’t ask the question',
@@ -27,6 +28,7 @@ export function ToolCall({ part: p }: { part: ToolPart }) {
       return <FetchCall part={p} running={running} />;
     case 'create_artifact':
     case 'update_artifact':
+    case 'edit_artifact':
     case 'create_report':
       return <ArtifactCard part={p} running={running} />;
     case 'use_skill': {

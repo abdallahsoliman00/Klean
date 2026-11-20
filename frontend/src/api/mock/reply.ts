@@ -97,7 +97,7 @@ export async function scriptedReply({ chat, prompt, images, answered, tools, cb 
     } else if (tools.has('artifacts') && has('/update')) {
       const a = artifacts.filter((x) => x.chatId === chat.id).at(-1);
       await say('Revising the most recent one.\n\n');
-      await tool('update_artifact', { id: a ? a.id : 'missing', content: '…' }, () => {
+      await tool('edit_artifact', { id: a ? a.id : 'missing', edits: [] }, () => {
         if (!a) throw new Error('There is no artifact in this chat to update.');
         (olderVersions[a.id] ??= []).push({ version: a.version, title: a.title, content: a.content, createdAt: a.updatedAt });
         const stamp = new Date().toLocaleTimeString();

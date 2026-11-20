@@ -7,7 +7,7 @@
    Download PDF answers 501 (no browser to render with), so the PDF is made in the page; in a chat with
    /serverpdf* in a message it returns a small PDF instead, and with /pdffail* it answers 502. */
 import {
-  IMAGE_TYPES, KEYLESS_SEARCH_PROVIDER, MAX_IMAGE_BYTES, MAX_IMAGES_PER_MESSAGE, MOCK_LATENCY, PRESET_NAME_MAX_CHARS, REPORT_KIND, SEARCH_PROVIDERS,
+  IMAGE_TYPES, KEYLESS_SEARCH_PROVIDER, MAX_IMAGE_BYTES, MAX_IMAGES_PER_MESSAGE, MAX_FILES_PER_MESSAGE, MOCK_LATENCY, PRESET_NAME_MAX_CHARS, REPORT_KIND, SEARCH_PROVIDERS,
   SKILL_DESCRIPTION_MAX_CHARS, SKILL_INSTRUCTIONS_MAX_CHARS, SKILL_NAME_MAX_CHARS, STATUS_BAD_GATEWAY, STATUS_CONFLICT, STATUS_INVALID, STATUS_NOT_FOUND, STATUS_NOT_IMPLEMENTED,
 } from '../../config';
 import type { Api, AppSettings, ChatConfig, ImageInput, Message, MessageImage, PresetInput, Provider, SendCallbacks, SendResult, Skill, SkillInput, ToolPart } from '../../types';
@@ -184,6 +184,8 @@ export const mockApi: Api = {
       const c = mustChat(id);
       if (runs.has(id)) throw new ApiError('This chat is already writing a reply.', STATUS_CONFLICT);
       let attached = storeImages(body.images);
+      let files = body.files ?? [];
+      if (files.length > MAX_FILES_PER_MESSAGE) throw invalid(`A message can have at most ${MAX_FILES_PER_MESSAGE} files.`);
       let prompt = content || '';
       let answered: string | null = null;
       if (answer) {
@@ -199,6 +201,7 @@ export const mockApi: Api = {
         if (editMessageId) {
           const cut = c.messages.splice(c.messages.findIndex((m) => m.id === editMessageId));
           attached = cut[0]?.images ?? []; // an edit changes the text only
+          files = cut[0]?.files ?? [];
           dropArtifacts(cut);
         }
         if (regenerate) {
@@ -207,7 +210,7 @@ export const mockApi: Api = {
           dropArtifacts(cut);
           prompt = c.messages.at(-1)?.content || '';
         } else {
-          const um: Message = { id: uid(), role: 'user', content, images: attached, parts: null, createdAt: Date.now() };
+          const um: Message = { id: uid(), role: 'user', content, images: attached, files, parts: null, createdAt: Date.now() };
           c.messages.push(um);
           cb.onUser?.(um);
         }

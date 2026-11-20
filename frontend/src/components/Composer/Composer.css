@@ -6,8 +6,19 @@
 .jump.show{opacity:1;visibility:visible;transform:translate(-50%,0)}
 .box{position:relative;background:var(--raised);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);transition:border-color .15s,box-shadow .2s}
 .box:focus-within{border-color:var(--faint)}
-.box textarea{font-family:var(--prompt);display:block;width:100%;border:0;outline:none;resize:none;background:transparent;padding:15px 16px 4px;line-height:1.5;max-height:240px;font-size:15px}
+.box textarea{font-family:var(--prompt);display:block;width:100%;border:0;outline:none;resize:none;background:transparent;line-height:1.5;font-size:15px}
 .box textarea::placeholder{color:var(--faint)}
+/* The message as blocks of text and code; together they scroll once tall */
+.input-blocks{max-height:240px;overflow-y:auto;padding:11px 0 4px}
+.box .text-input{padding:4px 16px 0}
+.code-input{margin:6px 12px;border-radius:10px;background:var(--code-bg);box-shadow:inset 0 0 0 1px var(--line)}
+.code-input-lang{padding:6px 12px 0;font:500 11px/1.4 var(--ui);color:var(--faint);text-transform:lowercase}
+/* the highlighted copy sits under the see-through textarea; both are laid out alike */
+.code-input-area{position:relative}
+.code-input-area pre,.box .code-input-area textarea{margin:0;padding:4px 12px 10px;font:13px/1.6 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;tab-size:4}
+.code-input-area pre{position:absolute;inset:0;pointer-events:none;overflow:hidden;color:var(--ink)}
+.box .code-input-area textarea{color:transparent;caret-color:var(--ink);overflow:hidden}
+.code-input-area pre *{font-style:normal!important;font-weight:inherit!important} /* keep each glyph exactly over the caret */
 .box-row{display:flex;align-items:center;gap:6px;padding:6px 8px 8px 10px}
 .chip{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;color:var(--muted);font-size:12.5px}
 .chip:hover,.chip[aria-expanded="true"]{background:var(--line-soft);color:var(--ink)}

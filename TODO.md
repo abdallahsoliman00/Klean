@@ -17,21 +17,21 @@
     - Artifacts
     - Ask questions
     - Web search
-- [ ] Make code syntax highlighting work even in the chat box. (Where if you type ``` in the prompt box you get syntax highlighting.)
+- [x] Make code syntax highlighting work even in the chat box. (Where if you type ``` in the prompt box you get syntax highlighting.)
 - [x] Slightly modify the colorscheme to make it less purple, or even better, make different dark and light themes available. (Five schemes, each light and dark, in Settings → Appearance.)
 - [x] Give the user the option to select from different code coloschemes as well.
 - [x] Favourite chats.
 - [x] Artifacts panel with all artifacts ever created. (in the panel below new chat)
 - [x] Load old artifacts and continue working on them. (Either load multiple together in the same chat or go to the old chat where it was originally created)
-- [ ] Use a patch method for the LLM to update an artifact instead of rewriting the entire file from scratch. This can be done by the LLM writing the EXACT text to match against and writing the replacement, both in the tool call. An edge case may arise if a document has lots of repeating text, so to mitigate that risk, the part to patch should be a UNIQUE section.
+- [x] Use a patch method for the LLM to update an artifact instead of rewriting the entire file from scratch. This can be done by the LLM writing the EXACT text to match against and writing the replacement, both in the tool call. An edge case may arise if a document has lots of repeating text, so to mitigate that risk, the part to patch should be a UNIQUE section.
 - [x] Allow for multiple system prompts. (Save system prompts to database where all you do is load the system prompt and reuse it.)
 - [ ] Make the application download the most recent version of the tool if one is available. (In other words, auto update the app)
 - [x] Possibly migrate the backend to Rust or Go while it's still small to make cross-compilation to other languages easier than Python.
 - [x] Add using images. The responses API now supports this.
 - [x] Also migrate from the completions, and ensure the OpenAI SDK is used.
 - [x] If responses endpoint doesn't exist fallback to completions.
-- [ ] Add file uploads
-- [ ] Add file creation (not just markdown files)
+- [x] Add file uploads (text files; PDFs and Office files not yet)
+- [ ] Add file creation like docx or pptx or xlsx files etc... Try creating a sandbox or a completely new version where the agent and execute shell commands as well.
 - [x] Embed the frontend in the executable.
 - [ ] Make a tree where you can wander off on tangents and come back. (Fork conversations and make a visual tree, that would be cool)
 - [x] Add Skills

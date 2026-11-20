@@ -22,9 +22,10 @@ type sendBody struct {
 	Model      string `json:"model"`
 	// Images are attached to a new message. An edit keeps the images the
 	// message had and ignores these.
-	Images        []imageBody `json:"images"`
-	EditMessageID string      `json:"editMessageId"`
-	Regenerate    bool        `json:"regenerate"`
+	Images        []imageBody  `json:"images"`
+	Files         []store.File `json:"files"`
+	EditMessageID string       `json:"editMessageId"`
+	Regenerate    bool         `json:"regenerate"`
 	// Tools lists the enabled tool groups. Omitted means all of them; an
 	// empty list sends no tools to the provider.
 	Tools *[]string `json:"tools"`
@@ -107,7 +108,11 @@ func (s *Server) prepareSend(chatID string, body sendBody) (*prepared, error) {
 	pid, model := &body.ProviderID, &body.Model
 	patch := store.ChatPatch{ProviderID: &pid, Model: &model}
 	if chat.Title == config.DefaultChatTitle && out.userMsg != nil {
-		t := prompt.MakeTitle(out.userMsg.Content)
+		text := out.userMsg.Content
+		if text == "" && len(out.userMsg.Files) > 0 {
+			text = out.userMsg.Files[0].Name // a message of files alone is named after the first
+		}
+		t := prompt.MakeTitle(text)
 		out.title, patch.Title = &t, &t
 	}
 	if chat, err = s.db.UpdateChat(chatID, patch, true); err != nil {
@@ -176,13 +181,17 @@ func (s *Server) addUserMessage(chatID string, body sendBody) (*store.Message, e
 	if err != nil {
 		return nil, err
 	}
-	if content == "" && len(images) == 0 {
+	files, err := parseFiles(body.Files)
+	if err != nil {
+		return nil, err
+	}
+	if content == "" && len(images) == 0 && len(files) == 0 {
 		return nil, errEmptyMessage
 	}
 	if err := s.skipPendingQuestions(chatID); err != nil {
 		return nil, err
 	}
-	return s.db.AddUserMessage(chatID, content, images)
+	return s.db.AddUserMessage(chatID, content, images, files)
 }
 
 var errEmptyMessage = errorf(http.StatusUnprocessableEntity, "Message is empty.")
@@ -273,7 +282,7 @@ func historyTurns(history []*store.Message, withCalls bool, imageData map[string
 	var turns []prompt.Turn
 	for _, m := range history {
 		if len(m.Parts) == 0 {
-			turns = append(turns, prompt.Turn{Role: m.Role, Content: m.Content, Images: turnImages(m.Images, imageData)})
+			turns = append(turns, prompt.Turn{Role: m.Role, Content: withFiles(m.Content, m.Files), Images: turnImages(m.Images, imageData)})
 			continue
 		}
 		for _, p := range m.Parts {

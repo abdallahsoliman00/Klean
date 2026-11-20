@@ -164,7 +164,7 @@ func TestSearchProviders(t *testing.T) {
 }
 
 func TestDefsAndGuidance(t *testing.T) {
-	if n := len(Defs(AllGroups)); n != 6 {
+	if n := len(Defs(AllGroups)); n != 7 {
 		t.Fatalf("%d tools", n)
 	}
 	if Defs(nil) != nil || Guidance(nil) != "" {
@@ -190,7 +190,7 @@ func TestReportHasItsOwnTool(t *testing.T) {
 			t.Fatalf("create_artifact offers the report kind: %v", kinds)
 		}
 	}
-	if got := strings.Join(names, ","); got != "create_artifact,create_report,update_artifact" {
+	if got := strings.Join(names, ","); got != "create_artifact,create_report,update_artifact,edit_artifact" {
 		t.Fatalf("artifact tools: %s", got)
 	}
 	if g := Guidance([]string{GroupArtifacts}); !strings.Contains(g, CreateReport) || !strings.Contains(g, "A4") {

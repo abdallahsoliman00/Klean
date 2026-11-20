@@ -224,6 +224,27 @@ func TestArtifactRoundTrip(t *testing.T) {
 		t.Fatalf("artifacts after update: %+v", got.Artifacts)
 	}
 
+	// edit_artifact replaces one unique passage and makes the next version.
+	ev = e.say("/edit Click me again => Press me", nil)
+	edited := as[artifact](t, find(ev, "artifact").data["artifact"])
+	if edited.Version != 3 || edited.Title != "Demo page (updated)" ||
+		edited.Content != strings.Replace(updated.Content, "Click me again", "Press me", 1) {
+		t.Fatalf("edited artifact: %+v", edited)
+	}
+	// A passage that isn't there fails, changes nothing, and the model is shown the real content.
+	ev = e.say("/edit Click me => x", nil)
+	if end := as[part](t, find(ev, "tool_end").data["part"]); end.Status != "error" || !strings.Contains(end.Error, "not found") {
+		t.Fatalf("failed edit: %+v", end)
+	}
+	reqs = e.fake.Requests()
+	last := reqs[len(reqs)-1]["input"].([]any)
+	if out := last[len(last)-1].(map[string]any)["output"].(string); !strings.Contains(out, edited.Content) {
+		t.Fatalf("failed edit output: %q", out)
+	}
+	if got := e.chat(); got.Artifacts[0].Version != 3 {
+		t.Fatalf("version after failed edit: %d", got.Artifacts[0].Version)
+	}
+
 	// Deleting the artifact; updating it afterwards is an error the model is told about.
 	if code := e.do("DELETE", "/artifacts/"+art.ID, nil, nil); code != 204 {
 		t.Fatalf("delete artifact: %d", code)

@@ -9,7 +9,7 @@ import { Glyph } from '../common/Glyph';
 export function ArtifactCard({ part: p, running }: { part: ToolPart; running: boolean }) {
   const a = p.args || {};
   const r = p.result || {};
-  const update = p.name === 'update_artifact';
+  const update = p.name === 'update_artifact' || p.name === 'edit_artifact';
   const report = p.name === 'create_report';
   const kind = r.kind || (report ? REPORT_KIND : undefined);
   const id = r.artifactId || (update ? a.id : undefined);
@@ -23,7 +23,7 @@ export function ArtifactCard({ part: p, running }: { part: ToolPart; running: bo
         <Glyph busy />
         <span className="a-text">
           <span className="a-title">{a.title || live?.title || (update ? 'Artifact' : report ? 'New report' : 'New artifact')}</span>
-          <span className="a-meta">{update ? 'Rewriting…' : 'Writing…'}</span>
+          <span className="a-meta">{p.name === 'edit_artifact' ? 'Editing…' : update ? 'Rewriting…' : 'Writing…'}</span>
         </span>
       </div>
     );

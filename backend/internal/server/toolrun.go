@@ -15,12 +15,12 @@ import (
 )
 
 // toolFailure is a tool error the model and the user are told about. Any
-// other error from a tool ends the turn.
-type toolFailure struct{ msg string }
+// other error from a tool ends the turn. detail is for the model only.
+type toolFailure struct{ msg, detail string }
 
 func (e *toolFailure) Error() string { return e.msg }
 
-func failTool(format string, a ...any) error { return &toolFailure{fmt.Sprintf(format, a...)} }
+func failTool(format string, a ...any) error { return &toolFailure{msg: fmt.Sprintf(format, a...)} }
 
 // outcome is what a tool produced: result for the UI, output for the model.
 type outcome struct {
@@ -54,6 +54,9 @@ func (t *turn) runTool(ctx context.Context, call llm.ToolCall) (store.Part, erro
 		}
 		msg := failureMessage(err)
 		part.Status, part.Error, part.Output = store.StatusError, msg, "Error: "+msg
+		if tf := (*toolFailure)(nil); errors.As(err, &tf) && tf.detail != "" {
+			part.Output += "\n\n" + tf.detail
+		}
 		return part, nil
 	}
 	if out.pending {
@@ -95,6 +98,8 @@ func (t *turn) dispatch(ctx context.Context, name string, part *store.Part) (out
 		return t.createReport(part.Args)
 	case tools.UpdateArtifact:
 		return t.updateArtifact(part.Args)
+	case tools.EditArtifact:
+		return t.editArtifact(part.Args)
 	case tools.UseSkill:
 		return t.useSkill(part.Args)
 	case tools.AskUser:
@@ -212,21 +217,58 @@ func (t *turn) updateArtifact(raw json.RawMessage) (outcome, error) {
 	if strings.TrimSpace(args.Content) == "" {
 		return outcome{}, failTool("content is empty. Send the complete new content.")
 	}
-	if args.Title != nil {
-		if title := cleanTitle(*args.Title); title == "" {
-			args.Title = nil
+	return t.saveArtifact(args.ID, args.Content, args.Title)
+}
+
+// editArtifact replaces unique passages of the artifact's current content.
+func (t *turn) editArtifact(raw json.RawMessage) (outcome, error) {
+	var args struct {
+		ID    string
+		Edits []tools.Edit
+		Title *string
+	}
+	if err := parseArgs(raw, &args); err != nil {
+		return outcome{}, err
+	}
+	a, err := t.s.db.Artifact(strings.TrimSpace(args.ID))
+	if err != nil {
+		return outcome{}, err
+	}
+	if a == nil || a.ChatID != t.chatID {
+		return outcome{}, missingArtifact(args.ID)
+	}
+	content, err := tools.ApplyEdits(a.Content, args.Edits)
+	if err != nil {
+		// The model may have lost track of the content; hand it the real thing.
+		return outcome{}, &toolFailure{msg: failureMessage(err), detail: "The current content is:\n" + a.Content}
+	}
+	if strings.TrimSpace(content) == "" {
+		return outcome{}, failTool("The edits would leave the artifact empty.")
+	}
+	return t.saveArtifact(a.ID, content, args.Title)
+}
+
+// saveArtifact stores a new version of the artifact; a blank title keeps the old one.
+func (t *turn) saveArtifact(id, content string, title *string) (outcome, error) {
+	if title != nil {
+		if clean := cleanTitle(*title); clean == "" {
+			title = nil
 		} else {
-			args.Title = &title
+			title = &clean
 		}
 	}
-	a, err := t.s.db.UpdateArtifact(t.chatID, strings.TrimSpace(args.ID), args.Content, args.Title)
+	a, err := t.s.db.UpdateArtifact(t.chatID, strings.TrimSpace(id), content, title)
 	if err != nil {
 		return outcome{}, err
 	}
 	if a == nil {
-		return outcome{}, failTool("This chat has no artifact with id %q. It may have been deleted; create a new one instead.", args.ID)
+		return outcome{}, missingArtifact(id)
 	}
 	return t.artifactOutcome(a, "Updated. The user sees the new version in the panel."), nil
+}
+
+func missingArtifact(id string) error {
+	return failTool("This chat has no artifact with id %q. It may have been deleted; create a new one instead.", id)
 }
 
 // ---------------- skills ----------------

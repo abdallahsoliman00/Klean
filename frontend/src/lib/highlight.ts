@@ -26,3 +26,4 @@ export function highlightOrNull(text: string, lang: string, guess: boolean): str
     return null;
   }
 }
+

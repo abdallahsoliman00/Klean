@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS skills (
 var addedColumns = []struct{ table, column, decl string }{
 	{"messages", "parts", "TEXT"},
 	{"chats", "favorite", "INTEGER NOT NULL DEFAULT 0"},
+	{"messages", "files", "TEXT"},
 }
 
 type Provider struct {
@@ -167,6 +168,13 @@ type Message struct {
 	CreatedAt int64   `json:"createdAt"`
 	Parts     []Part  `json:"parts,omitempty"`
 	Images    []Image `json:"images,omitempty"`
+	Files     []File  `json:"files,omitempty"`
+}
+
+// File is a text file the user attached to a message.
+type File struct {
+	Name string `json:"name"`
+	Text string `json:"text"`
 }
 
 const (
@@ -619,16 +627,21 @@ func (d *DB) RestoreChat(id string) (*Chat, error) {
 
 // ---------------- messages ----------------
 
-const messageCols = "id, role, content, model, stopped, created_at, parts"
+const messageCols = "id, role, content, model, stopped, created_at, parts, files"
 
 func scanMessage(row interface{ Scan(...any) error }) (*Message, error) {
 	var m Message
-	var model, parts sql.NullString
-	if err := row.Scan(&m.ID, &m.Role, &m.Content, &model, &m.Stopped, &m.CreatedAt, &parts); err != nil {
+	var model, parts, files sql.NullString
+	if err := row.Scan(&m.ID, &m.Role, &m.Content, &model, &m.Stopped, &m.CreatedAt, &parts, &files); err != nil {
 		return nil, err
 	}
 	if model.Valid {
 		m.Model = &model.String
+	}
+	if files.String != "" {
+		if err := json.Unmarshal([]byte(files.String), &m.Files); err != nil {
+			return nil, fmt.Errorf("decoding message files: %w", err)
+		}
 	}
 	var err error
 	m.Parts, err = decodeParts(parts)
@@ -665,15 +678,15 @@ func getMessage(q queryer, id string) (*Message, error) {
 
 // AddMessage appends a message. parts is nil for user messages.
 func (d *DB) AddMessage(chatID, role, content, model string, stopped bool, parts []Part) (*Message, error) {
-	return d.addMessage(chatID, role, content, model, stopped, parts, nil)
+	return d.addMessage(chatID, role, content, model, stopped, parts, nil, nil)
 }
 
-// AddUserMessage appends a user message with the pictures attached to it.
-func (d *DB) AddUserMessage(chatID, content string, images []NewImage) (*Message, error) {
-	return d.addMessage(chatID, "user", content, "", false, nil, images)
+// AddUserMessage appends a user message with the pictures and files attached to it.
+func (d *DB) AddUserMessage(chatID, content string, images []NewImage, files []File) (*Message, error) {
+	return d.addMessage(chatID, "user", content, "", false, nil, images, files)
 }
 
-func (d *DB) addMessage(chatID, role, content, model string, stopped bool, parts []Part, images []NewImage) (*Message, error) {
+func (d *DB) addMessage(chatID, role, content, model string, stopped bool, parts []Part, images []NewImage, files []File) (*Message, error) {
 	tx, err := d.sql.Begin()
 	if err != nil {
 		return nil, err
@@ -685,6 +698,12 @@ func (d *DB) addMessage(chatID, role, content, model string, stopped bool, parts
 	}
 	if err := insertImages(tx, id, images); err != nil {
 		return nil, err
+	}
+	if len(files) > 0 {
+		b, _ := json.Marshal(files)
+		if _, err := tx.Exec("UPDATE messages SET files = ? WHERE id = ?", string(b), id); err != nil {
+			return nil, err
+		}
 	}
 	m, err := getMessage(tx, id)
 	if err != nil {
@@ -733,7 +752,7 @@ func dropOrphanArtifacts(tx *sql.Tx, chatID, exceptID string) error {
 
 // ReplaceFrom is an edit: the message and everything after it are deleted,
 // along with the artifacts those messages created, and a user message with
-// the new content takes its place, keeping the images of the one it replaces.
+// the new content takes its place, keeping the images and files of the one it replaces.
 // It returns nil, nil when the chat has no such message.
 func (d *DB) ReplaceFrom(chatID, messageID, content string) (*Message, error) {
 	tx, err := d.sql.Begin()
@@ -755,6 +774,9 @@ func (d *DB) ReplaceFrom(chatID, messageID, content string) (*Message, error) {
 	}
 	// The images move first: deleting the old message would take them with it.
 	if _, err := tx.Exec("UPDATE images SET message_id = ? WHERE message_id = ?", id, messageID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec("UPDATE messages SET files = (SELECT files FROM messages WHERE id = ?) WHERE id = ?", messageID, id); err != nil {
 		return nil, err
 	}
 	if _, err := tx.Exec("DELETE FROM messages WHERE chat_id = ? AND seq >= ? AND id != ?", chatID, seq, id); err != nil {

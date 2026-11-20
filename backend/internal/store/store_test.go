@@ -204,8 +204,8 @@ func TestDeletingProviderClearsPresets(t *testing.T) {
 	}
 }
 
-// An edit moves the images to the message that replaces the edited one, and
-// images go with their message when it is deleted.
+// An edit moves the images and files to the message that replaces the edited
+// one, and images go with their message when it is deleted.
 func TestReplaceFromKeepsImages(t *testing.T) {
 	db, err := Open(filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {
@@ -213,8 +213,9 @@ func TestReplaceFromKeepsImages(t *testing.T) {
 	}
 	defer db.Close()
 	c, _ := db.CreateChat(NewChat{})
-	first, err := db.AddUserMessage(c.ID, "look", []NewImage{{"image/png", []byte("one")}, {"image/gif", []byte("two")}})
-	if err != nil || len(first.Images) != 2 || first.Images[1].MediaType != "image/gif" {
+	first, err := db.AddUserMessage(c.ID, "look", []NewImage{{"image/png", []byte("one")}, {"image/gif", []byte("two")}},
+		[]File{{"notes.md", "# hi"}})
+	if err != nil || len(first.Images) != 2 || first.Images[1].MediaType != "image/gif" || len(first.Files) != 1 {
 		t.Fatalf("add: %+v %v", first, err)
 	}
 	if _, err := db.AddMessage(c.ID, "assistant", "a cat", "m", false, nil); err != nil {
@@ -228,7 +229,7 @@ func TestReplaceFromKeepsImages(t *testing.T) {
 		t.Fatalf("images after edit: %+v, were %+v", edited.Images, first.Images)
 	}
 	msgs, _ := db.Messages(c.ID)
-	if len(msgs) != 1 || len(msgs[0].Images) != 2 {
+	if len(msgs) != 1 || len(msgs[0].Images) != 2 || len(msgs[0].Files) != 1 || msgs[0].Files[0] != (File{"notes.md", "# hi"}) {
 		t.Fatalf("messages after edit: %+v", msgs)
 	}
 	data, _ := db.ChatImageData(c.ID)
@@ -240,7 +241,7 @@ func TestReplaceFromKeepsImages(t *testing.T) {
 	}
 
 	// A second message's images go when an edit of the first removes it.
-	second, _ := db.AddUserMessage(c.ID, "", []NewImage{{"image/png", []byte("three")}})
+	second, _ := db.AddUserMessage(c.ID, "", []NewImage{{"image/png", []byte("three")}}, nil)
 	if _, err := db.ReplaceFrom(c.ID, edited.ID, "start over"); err != nil {
 		t.Fatal(err)
 	}

@@ -46,7 +46,7 @@ export function DropZone() {
     <div className={'dropzone' + (over ? ' show' : '')} aria-hidden="true">
       <div className="dropzone-card">
         <ImageIcon size={18} />
-        Drop images to attach them
+        Drop images or text files to attach them
       </div>
     </div>
   );

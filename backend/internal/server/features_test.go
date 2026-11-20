@@ -3,6 +3,7 @@ package server_test
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -134,6 +135,47 @@ func (e *toolEnv) chatImages() [][]imageRef {
 		out = append(out, m.Images)
 	}
 	return out
+}
+
+func TestFilesInMessages(t *testing.T) {
+	e := setupTools(t)
+	notes := map[string]any{"name": `C:\docs\notes.md`, "text": "# Plan\n<b>ship</b>\n"}
+
+	// A message may be files alone: saved by base name, named after the first, and read by the model before the text.
+	ev := e.sendAll(e.chatID, map[string]any{"providerId": e.providerID, "model": "fake-small", "files": []any{notes}})
+	if done := find(ev, "done"); done.data["title"] != "notes.md" {
+		t.Fatalf("title: %+v", done.data)
+	}
+	if files, _ := find(ev, "user").data["files"].([]any); len(files) != 1 || files[0].(map[string]any)["name"] != "notes.md" {
+		t.Fatalf("saved files: %+v", files)
+	}
+	e.say("and this", map[string]any{"files": []any{map[string]any{"name": "a.go", "text": "package a"}}})
+	last, _ := e.fake.Last()
+	input, _ := json.Marshal(last["input"])
+	for _, want := range []string{`\u003cfile name=\"notes.md\"\u003e\n# Plan`, `\u003cfile name=\"a.go\"\u003e\npackage a\n\u003c/file\u003e\n\nand this`} {
+		if !strings.Contains(string(input), want) {
+			t.Fatalf("model input lacks %s: %s", want, input)
+		}
+	}
+
+	var many []any
+	for range config.MaxFilesPerMessage + 1 {
+		many = append(many, notes)
+	}
+	for name, c := range map[string]struct {
+		files []any
+		want  string
+	}{
+		"too many":  {many, "at most 8 files"},
+		"binary":    {[]any{map[string]any{"name": "x.bin", "text": "a\x00b"}}, "x.bin isn't a text file"},
+		"too large": {[]any{map[string]any{"name": "big.txt", "text": strings.Repeat("a", config.MaxFileBytes+1)}}, "at most 512 KB"},
+	} {
+		var detail struct{ Detail string }
+		body := map[string]any{"providerId": e.providerID, "model": "fake-small", "files": c.files}
+		if code := e.do("POST", "/chats/"+e.chatID+"/messages", body, &detail); code != 422 || !strings.Contains(detail.Detail, c.want) {
+			t.Errorf("%s: %d %q", name, code, detail.Detail)
+		}
+	}
 }
 
 func TestImageValidation(t *testing.T) {

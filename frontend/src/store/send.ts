@@ -9,7 +9,7 @@ import { ApiError } from '../api/errors';
 import { PENDING_MESSAGE_ID, STATUS_CONFLICT } from '../config';
 import { dataUrl, preloadImage } from '../lib/images';
 import { findToolPart, patchToolPart, skipPendingQuestions } from '../lib/parts';
-import type { ImageInput, Message, MessageImage, Part, SendCallbacks, SendResult, ToolPart } from '../types';
+import type { FileInput, ImageInput, Message, MessageImage, Part, SendCallbacks, SendResult, ToolPart } from '../types';
 import { summaryOf, withArtifacts } from './chats';
 import type { Slice } from './types';
 
@@ -30,6 +30,8 @@ export interface SendOptions {
   content?: string;
   /** Images for a new message. An edited message keeps the ones it had. */
   images?: ImageInput[];
+  /** Text files for a new message. An edited message keeps the ones it had. */
+  files?: FileInput[];
   editMessageId?: string;
   regenerate?: boolean;
   answer?: { callId: string; text: string };
@@ -172,7 +174,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => {
       }
     },
 
-    async send({ content = '', images = [], editMessageId, regenerate, answer }) {
+    async send({ content = '', images = [], files = [], editMessageId, regenerate, answer }) {
       if (get().streaming) return;
       let created = false;
       if (!get().chat) {
@@ -199,6 +201,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => {
           const i = messages.findIndex((m) => m.id === editMessageId);
           if (i > -1) {
             shown = messages[i].images ?? [];
+            files = messages[i].files ?? [];
             get().forgetArtifacts(messages.slice(i));
             messages = messages.slice(0, i);
           }
@@ -210,7 +213,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => {
           messages = messages.slice(0, end);
         } else {
           const key = `pending-${Date.now()}`;
-          messages = [...messages, { id: PENDING_MESSAGE_ID, key, role: 'user', content, images: shown }];
+          messages = [...messages, { id: PENDING_MESSAGE_ID, key, role: 'user', content, images: shown, files }];
           set({ enterKey: key });
         }
         setMessages(() => messages);
@@ -250,6 +253,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => {
           {
             content: answer ? '' : content,
             ...(images.length && !editMessageId && !regenerate && !answer ? { images } : {}),
+            ...(files.length && !editMessageId && !regenerate && !answer ? { files } : {}),
             providerId: sel.providerId,
             model: sel.model,
             editMessageId,
@@ -269,7 +273,7 @@ export const createSendSlice: Slice<SendSlice> = (set, get) => {
           live.clear();
           set((s) => ({ threadVersion: s.threadVersion + 1 }));
           if (!get().composerText) get().setComposerText(content);
-          if (!editMessageId && !get().attachments.length) get().setAttachments(images);
+          if (!editMessageId && !get().attachments.length && !get().attachedFiles.length) get().setAttachments(images, files);
           get().toast(e.message);
           return;
         }

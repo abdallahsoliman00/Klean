@@ -37,9 +37,14 @@ const (
 	// Images attached to a message.
 	MaxImagesPerMessage = 8
 	MaxImageBytes       = 5 << 20 // per image, decoded
+	// Text files attached to a message.
+	MaxFilesPerMessage = 8
+	MaxFileBytes       = 512 << 10 // per file, as UTF-8
+	FileNameMaxChars   = 200
 	// MaxMessageBody is the body limit of a sent message: the most images
-	// it may carry, in base64 (4 bytes for every 3), on top of its text.
-	MaxMessageBody = MaxRequestBody + MaxImagesPerMessage*MaxImageBytes*4/3
+	// it may carry, in base64 (4 bytes for every 3), and the most file text
+	// (doubled for JSON escaping), on top of its text.
+	MaxMessageBody = MaxRequestBody + MaxImagesPerMessage*MaxImageBytes*4/3 + MaxFilesPerMessage*MaxFileBytes*2
 	// ImageMB is MaxImageBytes as error messages state it.
 	ImageMB = MaxImageBytes >> 20
 	// ImageCacheControl: an image never changes once saved, so the browser may keep it.
