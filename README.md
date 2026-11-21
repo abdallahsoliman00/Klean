@@ -7,8 +7,14 @@
 A chat UI that feels "Klean" and smooth. Connect it to any OpenAI-compatible endpoint and you're good to go.
 Everything is stored locally on your machine, and even better, it's all a single executable.
 
-It's an alternative to LibreChat and Open WebUI, which can need dependencies installed first. Klean just works out of the box.
+It's an alternative to LibreChat and Open WebUI, which may need dependencies to be installed first. Klean just works out of the box.
 
+<a id="a-note-on-the-comparison"></a>
+
+<p align="left"><sub>
+<strong>Note</strong>: This is not to discredit both of those platforms, as they are wonderful products. The difference is that Klean is deliberately small.
+One file, no runtime to install, no container to orchestrate. LibreChat and Open WebUI are built to be platforms; Klean is built to be a chat window that opens in a second.
+</sub></p>
 # Screenshots
 
 | | |
