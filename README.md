@@ -9,6 +9,17 @@ Everything is stored locally on your machine, and even better, it's all a single
 
 It's an alternative to LibreChat and Open WebUI, which can need dependencies installed first. Klean just works out of the box.
 
+# Screenshots
+
+| | |
+|:---:|---|
+| <img src="./assets/screenshots/artifacts.png" alt="Artifact panel with a live HTML preview" width="1500"> | **Artifacts**<br>Pages, code and documents open beside the chat, with live previews and versions. |
+| <img src="./assets/screenshots/report.png" alt="A PDF report open in the artifact panel" width="1500"> | **Reports**<br>The model can write multi-page reports with tables and charts, ready to download as PDF. |
+| <img src="./assets/screenshots/code-dark.png" alt="A chat with a highlighted code block in dark mode" width="1500"> | **Code and markdown**<br>Syntax highlighting, tables and LaTeX, in light or dark mode. |
+| <img src="./assets/screenshots/model-palette.png" alt="The model palette listing models from several providers" width="1500"> | **Any provider, any model**<br>Switch models mid-chat with Ctrl+K. |
+| <img src="./assets/screenshots/tools.png" alt="The tools menu in the composer" width="1500"> | **Tools**<br>Artifacts, questions back to you and web search, each toggled per chat. |
+| <img src="./assets/screenshots/settings.png" alt="The settings window on a provider page" width="1500"> | **Settings**<br>Add OpenAI-compatible providers, pick a look, set up web search and skills. |
+
 # How to Use
 Download the executable for your system from the [Releases](https://github.com/abdallahsoliman00/Klean/releases) page and run it.
 It opens a small terminal window, and closing that window stops Klean. It's recommended to move the window to a separate
