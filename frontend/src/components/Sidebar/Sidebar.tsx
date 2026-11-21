@@ -1,3 +1,4 @@
+import logo from '../../assets/logo.svg?raw';
 import { PanelIcon, PlusIcon } from '../common/icons';
 import { useStore } from '../../store';
 import { ChatList } from './ChatList';
@@ -12,7 +13,7 @@ export function Sidebar() {
     <aside className="sidebar" aria-label="Chats">
       <div className="sidebar-inner">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true" />
+          <div className="brand-mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: logo }} />
           <span className="brand-name">Klean</span>
         </div>
         <button className="new-chat" onClick={() => newChat()}>

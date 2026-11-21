@@ -6,6 +6,7 @@ import {
   type CodeSchemeId, type FontChoices, type FontId, type SchemeId, type ThemePref,
 } from '../config';
 import { readJson, readString } from './storage';
+import logo from '../assets/logo.svg?raw';
 
 export function storedThemePref(): ThemePref {
   const v = readString(STORAGE_KEYS.theme);
@@ -45,16 +46,13 @@ export function applyTheme(pref: ThemePref, scheme: SchemeId) {
   root.dataset.theme = dark ? 'dark' : 'light';
   root.dataset.scheme = scheme;
   const cs = getComputedStyle(root);
-  const ink = cs.getPropertyValue('--ink').trim();
+  const accent = cs.getPropertyValue('--accent').trim();
+  const accentInk = cs.getPropertyValue('--accent-ink').trim();
   const bg = cs.getPropertyValue('--bg').trim();
   const hex = /^#[0-9a-f]{3,8}$/i;
-  if (!hex.test(ink) || !hex.test(bg)) return;
+  if (![accent, accentInk, bg].every((c) => hex.test(c))) return;
   const icon = document.getElementById('favicon') as HTMLLinkElement | null;
   const meta = document.getElementById('themeColor') as HTMLMetaElement | null;
-  if (icon) icon.href = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg(ink, bg));
+  if (icon) icon.href = 'data:image/svg+xml,' + encodeURIComponent(logo.replace('#436663', accent).replace('#dbece9', accentInk));
   if (meta) meta.content = bg;
 }
-
-/** The brand mark: two offset bars on a rounded square. */
-const faviconSvg = (ink: string, bg: string) =>
-  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'><rect width='22' height='22' rx='7' fill='${ink}'/><rect x='5' y='7' width='8' height='2' rx='1' fill='${bg}'/><rect x='9' y='13' width='8' height='2' rx='1' fill='${bg}'/></svg>`;

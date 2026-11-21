@@ -3,9 +3,9 @@
 .sidebar{overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .sidebar-inner{width:var(--sidebar);display:flex;flex-direction:column;height:100%;padding:14px 10px 10px}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 14px}
-.brand-mark{width:22px;height:22px;border-radius:7px;background:var(--ink);position:relative}
-.brand-mark::before,.brand-mark::after{content:"";position:absolute;left:5px;right:5px;height:2px;border-radius:2px;background:var(--bg)}
-.brand-mark::before{top:7px;right:9px}.brand-mark::after{top:13px;left:9px}
+.brand-mark{width:22px;height:22px;display:flex}
+.brand-mark svg{width:100%;height:100%}
+.brand-mark .logo-bg{fill:var(--accent)}.brand-mark .logo-fg{fill:var(--accent-ink)}
 .brand-name{font-weight:600;font-size:15px;letter-spacing:-.01em}
 .new-chat{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:10px;background:var(--raised);border:1px solid var(--line);font-weight:500;transition:border-color .15s,transform .15s}
 .new-chat:hover{border-color:var(--faint)}

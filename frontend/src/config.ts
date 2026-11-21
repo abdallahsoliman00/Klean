@@ -68,7 +68,7 @@ export const DEFAULT_THEME: ThemePref = 'system';
 
 /** Colour schemes: id (matches [data-scheme] in styles/tokens.css), name, one-line description. */
 export const SCHEMES = [
-  { id: 'klean', name: 'Klean', note: 'Cool grey with a blue accent' },
+  { id: 'klean', name: 'Klean', note: 'Cool grey with a deep teal accent' },
   { id: 'graphite', name: 'Graphite', note: 'Neutral greys, ink for an accent' },
   { id: 'paper', name: 'Paper', note: 'Warm paper and amber' },
   { id: 'moss', name: 'Moss', note: 'Soft sage with a forest green accent' },

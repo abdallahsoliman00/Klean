@@ -8,19 +8,19 @@
   --ease:cubic-bezier(.2,.8,.2,1); --sidebar:280px; --art:clamp(380px,40vw,680px);
 }
 :root,[data-scheme="klean"]{
-  --bg:#E9ECF0; --surface:#F7F8FA; --raised:#FFFFFF; --ink:#1A1F27; --muted:#5D6673; --faint:#7F8894;
-  --line:#D9DEE5; --line-soft:#E5E9EE; --accent:#2B59C3; --accent-hover:#244CA8; --accent-soft:#E2E9F8;
-  --accent-ink:#FFFFFF; --user:#E1E7F3; --danger:#B4372F; --danger-soft:#F7E3E1; --ok:#2F7D4F; --caret:#D9822B;
-  --code-bg:#EEF1F5; --shadow:0 12px 40px -12px rgba(26,31,39,.28), 0 2px 6px rgba(26,31,39,.06);
-  --t-key:#7A3EB8; --t-str:#2B7549; --t-num:#A55410; --t-com:#7F8894; --t-fn:#2B59C3;
+  --bg:#E8ECEB; --surface:#F6F8F7; --raised:#FFFFFF; --ink:#18201F; --muted:#5A6866; --faint:#7C8987;
+  --line:#D6DEDC; --line-soft:#E3E9E7; --accent:#436663; --accent-hover:#36534F; --accent-soft:#DCE9E7;
+  --accent-ink:#F4FAF9; --user:#DEE8E6; --danger:#B4372F; --danger-soft:#F7E3E1; --ok:#2F7D4F; --caret:#D9822B;
+  --code-bg:#EDF1F0; --shadow:0 12px 40px -12px rgba(24,32,31,.28), 0 2px 6px rgba(24,32,31,.06);
+  --t-key:#7A3EB8; --t-str:#2B7549; --t-num:#A55410; --t-com:#7C8987; --t-fn:#2F6A66;
   color-scheme:light;
 }
 [data-theme="dark"]{
-  --bg:#07090B; --surface:#0F1216; --raised:#171B21; --ink:#E4E7EC; --muted:#979FAA; --faint:#6F7782;
-  --line:#262C35; --line-soft:#1A1F26; --accent:#6CA6F5; --accent-hover:#8DBBF8; --accent-soft:#15253B;
-  --accent-ink:#07111F; --user:#1B222C; --danger:#F08A80; --danger-soft:#33191A; --ok:#6CC594; --caret:#F0A75A;
-  --code-bg:#0A0C10; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
-  --t-key:#EE9488; --t-str:#8FD4A8; --t-num:#E9BD6B; --t-com:#6F7782; --t-fn:#8DB8F7;
+  --bg:#060908; --surface:#0E1312; --raised:#161C1B; --ink:#E3E9E8; --muted:#95A3A1; --faint:#6C7977;
+  --line:#25302E; --line-soft:#19201F; --accent:#8CC5BE; --accent-hover:#A9D6D0; --accent-soft:#152B29;
+  --accent-ink:#071413; --user:#1A2524; --danger:#F08A80; --danger-soft:#33191A; --ok:#6CC594; --caret:#F0A75A;
+  --code-bg:#090D0C; --shadow:0 16px 48px -12px rgba(0,0,0,.7), 0 2px 6px rgba(0,0,0,.4);
+  --t-key:#EE9488; --t-str:#8FD4A8; --t-num:#E9BD6B; --t-com:#6C7977; --t-fn:#7FCBC3;
   color-scheme:dark;
 }
 [data-scheme="graphite"]{
