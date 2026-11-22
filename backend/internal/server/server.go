@@ -34,6 +34,8 @@ type Server struct {
 	runs   map[string]*run
 	closed bool
 	active sync.WaitGroup // one for every run that hasn't ended
+
+	upd updateCache // see update.go
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.handler.ServeHTTP(w, r) }
@@ -60,7 +62,7 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) *Server
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		// "app" lets a second copy recognise one that is already running.
-		writeJSON(w, 200, map[string]any{"ok": true, "app": config.AppID})
+		writeJSON(w, 200, map[string]any{"ok": true, "app": config.AppID, "version": config.Version})
 	})
 
 	mux.HandleFunc("GET /api/providers", s.listProviders)
@@ -96,6 +98,8 @@ func New(db *store.DB, static fs.FS, corsOrigins string, opts ...Option) *Server
 	mux.HandleFunc("DELETE /api/skills/{id}", s.deleteSkill)
 	mux.HandleFunc("GET /api/settings", s.getSettings)
 	mux.HandleFunc("PATCH /api/settings", s.updateSettings)
+	mux.HandleFunc("GET /api/update", s.checkUpdate)
+	mux.HandleFunc("POST /api/update", s.applyUpdate)
 
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "Not found.")

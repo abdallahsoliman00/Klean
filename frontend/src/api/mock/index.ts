@@ -323,6 +323,11 @@ export const mockApi: Api = {
       skills.splice(skills.indexOf(mustSkill(id)), 1);
     },
   },
+  update: {
+    check: async () => ({ current: 'dev', latest: '', available: false, page: '' }),
+    apply: () => Promise.reject(new ApiError('The mock has nothing to update.')),
+  },
+  version: async () => 'dev',
   imageUrl: (id) => images.get(id) ?? '',
   settings: {
     async get() {

@@ -245,6 +245,14 @@ export interface SendResult {
   title: string | null;
 }
 
+/** Whether a newer Klean release exists (GET /api/update). */
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  available: boolean;
+  page: string;
+}
+
 /** Everything the UI can ask of the backend. Implemented over HTTP (api/http) and in memory (api/mock). */
 export interface Api {
   providers: {
@@ -293,6 +301,13 @@ export interface Api {
     update(id: string, patch: Partial<SkillInput>): Promise<Skill>;
     remove(id: string): Promise<void>;
   };
+  update: {
+    check(): Promise<UpdateInfo>;
+    /** Downloads the latest release and puts it in place of the running executable; it runs from the next start. */
+    apply(): Promise<{ version: string }>;
+  };
+  /** The running backend's version: "0.0.5", or "dev" for a build without one. */
+  version(): Promise<string>;
   /** Where an image's bytes are, for an <img>. */
   imageUrl(id: string): string;
 }

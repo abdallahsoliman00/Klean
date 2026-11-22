@@ -7,6 +7,8 @@
 .brand-mark svg{width:100%;height:100%}
 .brand-mark .logo-bg{fill:var(--accent)}.brand-mark .logo-fg{fill:var(--accent-ink)}
 .brand-name{font-weight:600;font-size:15px;letter-spacing:-.01em}
+.brand-title{display:flex;align-items:baseline;gap:6px}
+.brand-version{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
 .new-chat{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-radius:10px;background:var(--raised);border:1px solid var(--line);font-weight:500;transition:border-color .15s,transform .15s}
 .new-chat:hover{border-color:var(--faint)}
 .new-chat:active{transform:scale(.98)}

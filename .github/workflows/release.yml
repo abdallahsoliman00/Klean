@@ -110,7 +110,7 @@ jobs:
 
           echo "building ${name}/klean${EXT}"
           CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-            go build -trimpath -ldflags "-s -w" -o "${stage}/klean${EXT}" ./backend
+            go build -trimpath -ldflags "-s -w -X klean/backend/internal/config.Version=${version}" -o "${stage}/klean${EXT}" ./backend
 
           cp README.md "$stage/"
 

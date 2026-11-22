@@ -36,6 +36,7 @@ import (
 	"klean/backend/internal/pdf"
 	"klean/backend/internal/server"
 	"klean/backend/internal/store"
+	"klean/backend/internal/update"
 	"klean/frontend"
 )
 
@@ -81,6 +82,10 @@ func run() error {
 	headless := flag.Bool("headless", false, "don't open a browser or a terminal window (for services and autostart)")
 	flag.Parse()
 	*noBrowser = *noBrowser || *headless
+
+	if exe, err := update.Executable(); err == nil {
+		update.Cleanup(exe) // the copy an update moved aside
+	}
 
 	var static fs.FS = frontend.Files
 	switch *frontendDir {

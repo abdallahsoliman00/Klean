@@ -34,7 +34,17 @@ export const ENDPOINTS = {
   settings: '/settings',
   presets: '/presets',
   preset: (id: string) => `/presets/${id}`,
+  update: '/update',
+  health: '/health',
 } as const;
+
+/** The update banner's "Remind me" choices, in days, and where its snooze and skip are kept. */
+export const UPDATE_SNOOZE = [
+  { label: 'In 1 day', days: 1 },
+  { label: 'In 1 week', days: 7 },
+  { label: 'In 1 month', days: 30 },
+];
+export const UPDATE_STORAGE_KEY = 'klean.update';
 
 /** HTTP status the backend sends when an answered question is no longer open, or the chat is already writing a reply. */
 export const STATUS_CONFLICT = 409;

@@ -5,6 +5,7 @@ import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { Menu } from './components/common/Menu';
 import { Scrim } from './components/common/Scrim';
 import { Toasts } from './components/common/Toasts';
+import { UpdateBanner } from './components/common/UpdateBanner';
 import { Lightbox } from './components/Images/Lightbox';
 import { ArtifactLibrary } from './components/Library/ArtifactLibrary';
 import { ModelPalette } from './components/Palette/ModelPalette';
@@ -50,6 +51,7 @@ export function App() {
       <SettingsModal />
       <Menu />
       <Toasts />
+      <UpdateBanner />
       <ConfirmDialog />
       <Lightbox />
     </>
