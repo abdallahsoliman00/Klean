@@ -15,6 +15,7 @@ It's an alternative to LibreChat and Open WebUI, which may need dependencies to 
 <strong>Note</strong>: This is not to discredit both of those platforms, as they are wonderful products. The difference is that Klean is deliberately small.
 One file, no runtime to install, no container to orchestrate. LibreChat and Open WebUI are built to be platforms; Klean is built to be a chat window that opens in a second.
 </sub></p>
+
 # Screenshots
 
 | | |
