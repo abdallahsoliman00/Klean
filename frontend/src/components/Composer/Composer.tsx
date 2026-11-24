@@ -82,7 +82,7 @@ export function Composer({ showJump, onJump }: { showJump: boolean; onJump: () =
             <SendButton streaming={streaming} disabled={!streaming && !ready} />
           </div>
         </form>
-        <div className="hint">Enter sends, Shift+Enter adds a line, ```lang then Enter starts a code block, Ctrl+K switches model</div>
+        <div className="hint">Enter sends, Shift+Enter adds a line, Ctrl+K switches model</div>
       </div>
     </div>
   );
